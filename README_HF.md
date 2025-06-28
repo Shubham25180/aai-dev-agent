@@ -2,92 +2,7 @@
 
 A memory-aware, undo-capable, proactive AI developer assistant with voice support and hybrid LLM integration.
 
-## 🚀 Quick Start
-
-### 🧪 **Test on Hugging Face Spaces**
-
-**Live Demo**: [AI Dev Agent Space](https://huggingface.co/spaces/Shubham25180/ai)
-
-Click the link above to test the AI Dev Agent directly in your browser!
-
-### 🏠 **Local Installation**
-
-```bash
-# Clone the repository
-git clone https://github.com/your-username/ai-dev-agent.git
-cd ai-dev-agent
-
-# Install dependencies
-pip install -r requirements.txt
-
-# For Hugging Face integration
-pip install -r requirements_huggingface.txt
-
-# Start the AI Dev Agent
-python main.py
-```
-
-## 🔄 **Updating the Repository**
-
-### **1. Make Local Changes**
-
-```bash
-# Edit your files locally
-# Test your changes
-python main.py
-```
-
-### **2. Update Hugging Face Repository**
-
-```bash
-# Upload changes to Hugging Face
-C:\Users\shubh\AppData\Roaming\Python\Python313\Scripts\huggingface-cli.exe upload Shubham25180/ai .
-
-# Or use the full path on your system
-huggingface-cli upload Shubham25180/ai .
-```
-
-### **3. Update GitHub (if you have it)**
-
-```bash
-git add .
-git commit -m "Update: [describe your changes]"
-git push origin main
-```
-
-## 🧪 **Testing Options**
-
-### **Option 1: Hugging Face Spaces (Recommended)**
-
-- **No installation required**
-- **Instant testing**
-- **Web interface**
-- **Automatic updates**
-
-Visit: https://huggingface.co/spaces/Shubham25180/ai
-
-### **Option 2: Local Testing**
-
-```bash
-# Run the main application
-python main.py
-
-# Run speed tests
-python test_hybrid_speed.py
-python test_huggingface_speed.py
-
-# Run voice tests
-python test_voice.py
-```
-
-### **Option 3: Streamlit Demo**
-
-```bash
-# Run the web demo locally
-streamlit run app.py
-```
-
-## 📊 **Features**
+## 🚀 Features
 
 ### Core Capabilities
 
@@ -136,11 +51,47 @@ AI Dev Agent/
 │   └── memory_manager.py
 ├── undo/                  # Undo system
 │   └── undo_manager.py
-├── app.py                 # Streamlit demo for Spaces
 └── config/                # Configuration files
     ├── settings.yaml
     ├── settings_hybrid.yaml
     └── settings_huggingface.yaml
+```
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/ai-dev-agent.git
+cd ai-dev-agent
+
+# Install dependencies
+pip install -r requirements.txt
+
+# For Hugging Face integration
+pip install -r requirements_huggingface.txt
+```
+
+### Configuration
+
+```bash
+# Use hybrid configuration (recommended)
+cp config/settings_hybrid.yaml config/settings.yaml
+
+# Or use Hugging Face only
+cp config/settings_huggingface.yaml config/settings.yaml
+```
+
+### Running
+
+```bash
+# Start the AI Dev Agent
+python main.py
+
+# Run speed tests
+python test_hybrid_speed.py
+python test_huggingface_speed.py
 ```
 
 ## 🧠 Hybrid LLM System
@@ -257,46 +208,6 @@ print(f"Cache hit rate: {metrics['cache_hit_rate']:.1%}")
 print(f"Average response time: {metrics['avg_response_time']:.3f}s")
 ```
 
-## 🔄 **Update Workflow**
-
-### **Daily Development Cycle**
-
-1. **Make Changes Locally**
-
-   ```bash
-   # Edit your code
-   # Test locally
-   python main.py
-   ```
-
-2. **Test on Hugging Face**
-
-   ```bash
-   # Upload to test
-   huggingface-cli upload Shubham25180/ai .
-   # Visit: https://huggingface.co/spaces/Shubham25180/ai
-   ```
-
-3. **Commit to Version Control**
-   ```bash
-   git add .
-   git commit -m "Feature: [description]"
-   git push origin main
-   ```
-
-### **Automated Updates (Optional)**
-
-Create a script for easy updates:
-
-```bash
-# update_repo.sh
-#!/bin/bash
-echo "🔄 Updating Hugging Face repository..."
-huggingface-cli upload Shubham25180/ai .
-echo "✅ Update complete!"
-echo "🌐 Visit: https://huggingface.co/spaces/Shubham25180/ai"
-```
-
 ## 📈 Roadmap
 
 - [ ] **Advanced Code Analysis**: AST-based code understanding
@@ -310,7 +221,7 @@ echo "🌐 Visit: https://huggingface.co/spaces/Shubham25180/ai"
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test on Hugging Face Spaces
+4. Add tests
 5. Submit a pull request
 
 ## 📄 License
@@ -329,10 +240,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Made with ❤️ by Shubham25180**
 
 _Your AI Development Companion_
-
-## 🔗 **Quick Links**
-
-- **🌐 Live Demo**: [Hugging Face Spaces](https://huggingface.co/spaces/Shubham25180/ai)
-- **📚 Documentation**: [Wiki](https://github.com/your-username/ai-dev-agent/wiki)
-- **🐛 Issues**: [Bug Reports](https://github.com/your-username/ai-dev-agent/issues)
-- **💬 Discussions**: [Community](https://github.com/your-username/ai-dev-agent/discussions)

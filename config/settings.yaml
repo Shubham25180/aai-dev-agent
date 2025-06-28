@@ -57,8 +57,9 @@ model:
 # Safety settings
 safety:
   require_confirmation: true
-  max_file_size: 10485760  # 10MB
-  allowed_extensions: [".py", ".js", ".html", ".css", ".json", ".yaml", ".txt", ".md"]
+  max_file_size: 10485760 # 10MB
+  allowed_extensions:
+    [".py", ".js", ".html", ".css", ".json", ".yaml", ".txt", ".md"]
   blocked_commands: ["rm -rf", "format c:", "del /s /q"]
 
-os_mode: auto  # auto, windows, linux, mac 
+os_mode: auto # auto, windows, linux, mac

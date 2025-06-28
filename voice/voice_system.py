@@ -1,3 +1,4 @@
+import yaml
 import os
 import threading
 import time
@@ -5,87 +6,101 @@ from typing import Dict, Any, Optional, Callable
 from utils.logger import get_action_logger, get_error_logger
 from .recognizer import Recognizer
 from .responder import Responder
-from .commands import VoiceCommands
+from .commands import CommandProcessor
 
 class VoiceSystem:
     """
-    Integrated voice system that combines speech recognition, TTS, and command parsing.
-    Provides a complete voice interface for the AI Dev Agent.
+    Main voice system coordinator using Whisper for multi-language speech recognition.
+    Handles recognition, command processing, and text-to-speech responses.
     """
     
-    def __init__(self, config: Dict[str, Any], command_callback: Optional[Callable] = None):
-        """
-        Initialize the voice system with configuration and command callback.
-        
-        Args:
-            config: Configuration dictionary with voice settings
-            command_callback: Callback function to handle parsed commands
-        """
-        self.config = config
+    def __init__(self, config_path='config/settings.yaml'):
         self.logger = get_action_logger('voice_system')
         self.error_logger = get_error_logger('voice_system')
-        
-        # Voice settings from config
-        voice_config = config.get('voice', {})
-        self.model_path = voice_config.get('model_path', 'model')
-        self.sample_rate = voice_config.get('sample_rate', 16000)
-        self.min_confidence = voice_config.get('min_confidence', 0.6)
-        self.tts_rate = voice_config.get('tts_rate', 180)
-        self.tts_volume = voice_config.get('tts_volume', 1.0)
+        self.config_path = config_path
+        self.config = self._load_config()
         
         # Initialize components
-        self.recognizer = Recognizer(self.model_path, self.sample_rate)
-        self.responder = Responder(self.tts_rate, self.tts_volume)
-        self.command_parser = VoiceCommands(min_confidence=self.min_confidence)
-        
-        # System state
+        self.recognizer = None
+        self.responder = None
+        self.command_processor = None
         self.is_active = False
-        self.command_callback = command_callback
-        self.recognition_thread = None
         
-        # Voice interaction history
-        self.interaction_history = []
-        
-        self.logger.info("Voice system initialized")
+        self._initialize_components()
 
-    def start(self) -> bool:
-        """
-        Start the voice system for continuous listening.
-        
-        Returns:
-            True if started successfully, False otherwise
-        """
+    def _load_config(self):
+        """Load voice system configuration."""
         try:
-            if not self.recognizer.model:
-                self.speak("Voice recognition model not available. Please check model installation.")
+            with open(self.config_path, 'r') as file:
+                config = yaml.safe_load(file)
+            self.logger.info("Voice system configuration loaded")
+            return config
+        except Exception as e:
+            self.error_logger.error(f"Failed to load voice config: {e}")
+            return {}
+
+    def _initialize_components(self):
+        """Initialize voice recognition and response components."""
+        try:
+            voice_config = self.config.get('voice', {})
+            
+            # Initialize Whisper recognizer with multi-language support
+            self.recognizer = Recognizer(
+                model_size=voice_config.get('model_size', 'medium'),
+                device=voice_config.get('device', 'cpu'),
+                compute_type=voice_config.get('compute_type', 'int8')
+            )
+            
+            # Initialize text-to-speech responder
+            self.responder = Responder(
+                rate=voice_config.get('tts_rate', 180),
+                volume=voice_config.get('tts_volume', 1.0)
+            )
+            
+            # Initialize command processor
+            self.command_processor = CommandProcessor(
+                commands=voice_config.get('commands', [])
+            )
+            
+            self.logger.info("Voice system components initialized successfully")
+            
+        except Exception as e:
+            self.error_logger.error(f"Failed to initialize voice components: {e}")
+            raise
+
+    def start(self):
+        """Start the voice system."""
+        try:
+            if not self.config.get('voice', {}).get('enabled', False):
+                self.logger.warning("Voice system is disabled in configuration")
                 return False
             
-            self.is_active = True
-            self.recognition_thread = threading.Thread(target=self._recognition_loop)
-            self.recognition_thread.daemon = True
-            self.recognition_thread.start()
+            if self.is_active:
+                self.logger.warning("Voice system is already active")
+                return True
             
-            self.speak("Voice system activated. I'm listening for commands.")
-            self.logger.info("Voice system started successfully")
-            return True
-            
+            # Start recognition
+            if self.recognizer.start():
+                self.is_active = True
+                self.logger.info("Voice system started successfully")
+                self.responder.speak("Voice system activated. Ready for commands.")
+                return True
+            else:
+                self.logger.error("Failed to start voice recognition")
+                return False
+                
         except Exception as e:
             self.error_logger.error(f"Failed to start voice system: {e}")
             return False
 
-    def stop(self) -> bool:
-        """
-        Stop the voice system.
-        
-        Returns:
-            True if stopped successfully, False otherwise
-        """
+    def stop(self):
+        """Stop the voice system."""
         try:
-            self.is_active = False
-            if self.recognition_thread:
-                self.recognition_thread.join(timeout=2)
+            if not self.is_active:
+                return True
             
-            self.speak("Voice system deactivated.")
+            self.recognizer.stop()
+            self.is_active = False
             self.logger.info("Voice system stopped")
             return True
             
@@ -93,163 +108,110 @@ class VoiceSystem:
             self.error_logger.error(f"Failed to stop voice system: {e}")
             return False
 
-    def _recognition_loop(self):
+    def listen_once(self, duration=5.0):
         """
-        Main recognition loop that continuously listens for voice input.
-        """
-        try:
-            while self.is_active:
-                # Listen for a single utterance
-                result = self.recognizer.recognize_once()
-                
-                if result.get('success', False):
-                    text = result.get('text', '')
-                    confidence = result.get('confidence', 0.0)
-                    
-                    if text.strip():  # Only process non-empty text
-                        self._process_voice_input(text, confidence)
-                else:
-                    # Brief pause before next recognition attempt
-                    time.sleep(0.1)
-                    
-        except Exception as e:
-            self.error_logger.error(f"Recognition loop error: {e}")
-
-    def _process_voice_input(self, text: str, confidence: float):
-        """
-        Process voice input through command parser and execute if valid.
+        Listen for a single voice command.
         
         Args:
-            text: Recognized text
-            confidence: Recognition confidence score
-        """
-        try:
-            # Log the voice input
-            self.logger.info(f"Processing voice input: {text}", extra={'confidence': confidence})
+            duration: Recording duration in seconds
             
-            # Parse the command
-            parsed = self.command_parser.interpret(text, confidence)
-            
-            # Store in interaction history
-            self.interaction_history.append({
-                'timestamp': time.time(),
-                'text': text,
-                'confidence': confidence,
-                'parsed': parsed
-            })
-            
-            if parsed.get('success', False):
-                command = parsed.get('command')
-                args = parsed.get('args', [])
-                
-                # Confirm the command
-                self.speak(f"Executing command: {command}")
-                
-                # Execute via callback if available
-                if self.command_callback:
-                    try:
-                        result = self.command_callback(command, args, text)
-                        if result and result.get('success', False):
-                            self.speak("Command executed successfully")
-                        else:
-                            self.speak("Command execution failed")
-                    except Exception as e:
-                        self.error_logger.error(f"Command execution error: {e}")
-                        self.speak("An error occurred while executing the command")
-                else:
-                    self.logger.warning("No command callback available")
-                    
-            else:
-                reason = parsed.get('reason', 'unknown')
-                if reason == 'low_confidence':
-                    self.speak("I didn't hear that clearly. Please repeat.")
-                elif reason == 'no_match':
-                    self.speak("I don't understand that command. Please try again.")
-                else:
-                    self.speak("I couldn't process that command.")
-                    
-        except Exception as e:
-            self.error_logger.error(f"Voice input processing error: {e}")
-
-    def speak(self, text: str):
-        """
-        Speak text using TTS.
-        
-        Args:
-            text: Text to speak
-        """
-        try:
-            self.responder.speak(text)
-        except Exception as e:
-            self.error_logger.error(f"TTS error: {e}")
-
-    def listen_once(self) -> Dict[str, Any]:
-        """
-        Listen for a single voice command (blocking).
-        
         Returns:
-            Recognition result dictionary
+            dict: Recognition result with text, confidence, and language
         """
         try:
-            self.logger.info("Listening for single command...")
-            result = self.recognizer.recognize_once()
+            if not self.is_active:
+                self.logger.warning("Voice system not active, starting temporarily")
+                self.recognizer.start()
             
-            if result.get('success', False):
-                text = result.get('text', '')
-                confidence = result.get('confidence', 0.0)
-                
-                if text.strip():
-                    self._process_voice_input(text, confidence)
-                    
+            result = self.recognizer.recognize_once(duration)
+            
+            if result.get('success') and result.get('text'):
+                self._process_command(result)
+            
             return result
             
         except Exception as e:
-            self.error_logger.error(f"Single listen error: {e}")
+            self.error_logger.error(f"Error during single listening: {e}")
             return {'success': False, 'error': str(e)}
 
-    def add_custom_command(self, pattern: str, command: str):
+    def _process_command(self, recognition_result):
         """
-        Add a custom voice command pattern.
+        Process recognized speech as a command.
         
         Args:
-            pattern: Regex pattern to match
-            command: Command name to execute
+            recognition_result: Result from speech recognition
         """
         try:
-            self.command_parser.command_map[pattern] = command
-            self.logger.info(f"Added custom command: {pattern} -> {command}")
+            text = recognition_result.get('text', '')
+            confidence = recognition_result.get('confidence', 0.0)
+            language = recognition_result.get('language', 'unknown')
+            
+            self.logger.info(
+                f"Processing command: '{text}' (lang: {language}, conf: {confidence:.2f})",
+                extra={
+                    'confidence': confidence,
+                    'language': language,
+                    'command_text': text
+                }
+            )
+            
+            # Check confidence threshold
+            min_confidence = self.config.get('voice', {}).get('min_confidence', 0.6)
+            if confidence < min_confidence:
+                self.responder.speak(f"Command not recognized clearly. Please repeat.")
+                return
+            
+            # Process command
+            command_result = self.command_processor.process(text)
+            
+            if command_result.get('success'):
+                self.responder.speak(f"Executing: {command_result.get('action')}")
+                # Here you would execute the actual command
+                self.logger.info(f"Command executed: {command_result}")
+            else:
+                self.responder.speak("Command not understood. Please try again.")
+                
         except Exception as e:
-            self.error_logger.error(f"Failed to add custom command: {e}")
+            self.error_logger.error(f"Error processing command: {e}")
+            self.responder.speak("Error processing command.")
 
-    def get_interaction_history(self, limit: int = 10) -> list:
+    def get_status(self):
+        """Get current voice system status."""
+        return {
+            'active': self.is_active,
+            'enabled': self.config.get('voice', {}).get('enabled', False),
+            'model_info': self.recognizer.get_model_info() if self.recognizer else None,
+            'supported_languages': self.recognizer.get_supported_languages() if self.recognizer else []
+        }
+
+    def test_recognition(self, duration=3.0):
         """
-        Get recent voice interaction history.
+        Test speech recognition functionality.
         
         Args:
-            limit: Maximum number of interactions to return
+            duration: Test recording duration
             
         Returns:
-            List of recent interactions
+            dict: Test results
         """
-        return self.interaction_history[-limit:] if self.interaction_history else []
+        try:
+            self.logger.info("Starting recognition test...")
+            self.responder.speak("Testing speech recognition. Please speak now.")
+            
+            result = self.listen_once(duration)
+            
+            if result.get('success'):
+                self.responder.speak(f"Test successful. Recognized: {result.get('text')}")
+            else:
+                self.responder.speak("Test failed. Please check microphone and try again.")
+            
+            return result
+            
+        except Exception as e:
+            self.error_logger.error(f"Recognition test failed: {e}")
+            return {'success': False, 'error': str(e)}
 
-    def clear_history(self):
-        """Clear voice interaction history."""
-        self.interaction_history.clear()
-        self.logger.info("Voice interaction history cleared")
-
-    def get_status(self) -> Dict[str, Any]:
-        """
-        Get voice system status.
-        
-        Returns:
-            Status dictionary
-        """
-        return {
-            'is_active': self.is_active,
-            'model_loaded': self.recognizer.model is not None,
-            'interaction_count': len(self.interaction_history),
-            'min_confidence': self.min_confidence,
-            'tts_rate': self.tts_rate,
-            'tts_volume': self.tts_volume
-        } 
+    def __del__(self):
+        """Cleanup on destruction."""
+        if self.is_active:
+            self.stop() 

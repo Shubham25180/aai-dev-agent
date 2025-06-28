@@ -20,8 +20,8 @@ class Bootstrap:
     def __init__(self, config_path: str = 'config/settings.yaml'):
         """
         Initialize Bootstrap with configuration path.
-        
-        Args:
+
+    Args:
             config_path: Path to configuration file
         """
         self.config_path = config_path
@@ -237,8 +237,8 @@ class Bootstrap:
     def initialize_voice_system(self) -> bool:
         """
         Initialize the voice system with command handler.
-        
-        Returns:
+
+    Returns:
             True if successful, False otherwise
         """
         try:
@@ -255,11 +255,8 @@ class Bootstrap:
             # Initialize voice command handler
             self.voice_handler = VoiceCommandHandler(self.controller)
             
-            # Initialize voice system
-            self.voice_system = VoiceSystem(
-                config=self.config,
-                command_callback=self.voice_handler.handle_command
-            )
+            # Initialize voice system (without command_callback parameter)
+            self.voice_system = VoiceSystem()
             
             # Auto-start voice system if configured
             if voice_config.get('auto_start', False):
@@ -345,8 +342,8 @@ class Bootstrap:
     def get_component(self, component_name: str):
         """
         Get a specific component by name.
-        
-        Args:
+
+    Args:
             component_name: Name of the component to retrieve
             
         Returns:
@@ -416,8 +413,8 @@ class Bootstrap:
     def shutdown(self) -> bool:
         """
         Gracefully shutdown the application and save state.
-        
-        Returns:
+    
+    Returns:
             True if successful, False otherwise
         """
         try:

@@ -193,4 +193,68 @@ models/
 # Backup files
 *.bak
 *.backup
-*.old 
+*.old
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Model files (too large for upload)
+models/
+*.gguf
+*.bin
+*.safetensors
+
+# Cache
+.cache/
+*.cache
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Environment variables
+.env
+.env.local
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Documentation builds
+docs/_build/
+
+# Large data files
+*.csv
+*.json
+*.parquet
+*.h5
+*.hdf5
+
+# Audio files (if any)
+*.wav
+*.mp3
+*.flac
+
+# Keep important configs but exclude sensitive data
+config/settings_local.yaml
+config/secrets.yaml 

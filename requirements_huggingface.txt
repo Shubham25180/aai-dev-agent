@@ -1,0 +1,40 @@
+# Hugging Face Integration Dependencies
+
+# Core Hugging Face libraries
+transformers>=4.35.0
+torch>=2.0.0
+accelerate>=0.24.0
+tokenizers>=0.15.0
+
+# Model serving and optimization
+optimum>=1.15.0
+optimum[onnxruntime]>=1.15.0
+onnxruntime>=1.16.0
+
+# Fast inference libraries
+ctransformers>=0.2.27
+sentence-transformers>=2.2.2
+
+# Quantization for speed
+bitsandbytes>=0.41.0
+auto-gptq>=0.5.0
+
+# Web API for Hugging Face
+huggingface-hub>=0.19.0
+requests>=2.28.0
+
+# Async support
+aiohttp>=3.8.0
+asyncio-throttle>=1.0.2
+
+# Performance monitoring
+psutil>=5.9.0
+memory-profiler>=0.61.0
+
+# Existing dependencies (keep these)
+pyyaml>=6.0
+colorama>=0.4.5
+faster-whisper>=0.9.0
+sounddevice>=0.4.6
+pyttsx3>=2.90
+numpy>=1.21.0 
