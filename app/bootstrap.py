@@ -7,11 +7,13 @@ from memory.memory_manager import MemoryManager
 from agents.planner import Planner
 from app.router import Router
 from app.controller import Controller
+from app.voice_handler import VoiceCommandHandler
+from voice.voice_system import VoiceSystem
 
 class Bootstrap:
     """
     Application bootstrap and initialization system.
-    Sets up all components with proper memory integration.
+    Sets up all components with proper memory integration and voice system.
     Follows AGENT_MANIFEST.md principles for automatic initialization.
     """
     
@@ -32,6 +34,8 @@ class Bootstrap:
         self.planner = None
         self.router = None
         self.controller = None
+        self.voice_handler = None
+        self.voice_system = None
         
         self.logger.info("Bootstrap initialized")
 
@@ -87,7 +91,8 @@ class Bootstrap:
                 'logs/actions',
                 'logs/errors',
                 'logs/sessions',
-                'memory/embeddings'
+                'memory/embeddings',
+                'model'  # For Vosk models
             ]
             
             for dir_path in additional_dirs:
@@ -229,6 +234,47 @@ class Bootstrap:
             self.error_logger.error(f"Failed to initialize controller: {e}")
             return False
 
+    def initialize_voice_system(self) -> bool:
+        """
+        Initialize the voice system with command handler.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Check if voice is enabled in config
+            voice_config = self.config.get('voice', {})
+            if not voice_config.get('enabled', False):
+                self.logger.info("Voice system disabled in configuration")
+                return True
+            
+            if not self.controller:
+                self.error_logger.error("Controller not initialized")
+                return False
+            
+            # Initialize voice command handler
+            self.voice_handler = VoiceCommandHandler(self.controller)
+            
+            # Initialize voice system
+            self.voice_system = VoiceSystem(
+                config=self.config,
+                command_callback=self.voice_handler.handle_command
+            )
+            
+            # Auto-start voice system if configured
+            if voice_config.get('auto_start', False):
+                if self.voice_system.start():
+                    self.logger.info("Voice system auto-started")
+                else:
+                    self.logger.warning("Failed to auto-start voice system")
+            
+            self.logger.info("Voice system initialized successfully")
+            return True
+            
+        except Exception as e:
+            self.error_logger.error(f"Failed to initialize voice system: {e}")
+            return False
+
     def bootstrap_application(self) -> Dict[str, Any]:
         """
         Complete application bootstrap process.
@@ -259,11 +305,15 @@ class Bootstrap:
             if not self.initialize_controller():
                 return {'success': False, 'error': 'Failed to initialize controller'}
             
-            # Step 6: Update memory with bootstrap completion
+            # Step 6: Initialize voice system
+            if not self.initialize_voice_system():
+                return {'success': False, 'error': 'Failed to initialize voice system'}
+            
+            # Step 7: Update memory with bootstrap completion
             if self.memory_manager:
                 self.memory_manager.update_short_term('bootstrap_status', {
                     'status': 'completed',
-                    'components_initialized': ['memory_manager', 'planner', 'router', 'controller'],
+                    'components_initialized': ['memory_manager', 'planner', 'router', 'controller', 'voice_system'],
                     'completed_at': self.memory_manager.get_core_behavior('bootstrap_completed_at', '')
                 })
             
@@ -274,10 +324,13 @@ class Bootstrap:
                     'memory_manager': self.memory_manager is not None,
                     'planner': self.planner is not None,
                     'router': self.router is not None,
-                    'controller': self.controller is not None
+                    'controller': self.controller is not None,
+                    'voice_handler': self.voice_handler is not None,
+                    'voice_system': self.voice_system is not None
                 },
                 'config_sections': list(self.config.keys()),
-                'memory_stats': self.memory_manager.get_memory_stats() if self.memory_manager else {}
+                'memory_stats': self.memory_manager.get_memory_stats() if self.memory_manager else {},
+                'voice_enabled': self.config.get('voice', {}).get('enabled', False)
             }
             
             self.logger.info("Application bootstrap completed successfully", 
@@ -303,7 +356,9 @@ class Bootstrap:
             'memory_manager': self.memory_manager,
             'planner': self.planner,
             'router': self.router,
-            'controller': self.controller
+            'controller': self.controller,
+            'voice_handler': self.voice_handler,
+            'voice_system': self.voice_system
         }
         
         return components.get(component_name)
@@ -337,6 +392,13 @@ class Bootstrap:
                     'controller': {
                         'initialized': self.controller is not None,
                         'session_stats': self.controller.get_session_stats() if self.controller else {}
+                    },
+                    'voice_handler': {
+                        'initialized': self.voice_handler is not None
+                    },
+                    'voice_system': {
+                        'initialized': self.voice_system is not None,
+                        'status': self.voice_system.get_status() if self.voice_system else {}
                     }
                 },
                 'configuration': {
@@ -360,6 +422,10 @@ class Bootstrap:
         """
         try:
             self.logger.info("Starting application shutdown")
+            
+            # Stop voice system
+            if self.voice_system:
+                self.voice_system.stop()
             
             # Save memory state
             if self.memory_manager:
@@ -388,6 +454,5 @@ if __name__ == '__main__':
         app_state = bootstrap.bootstrap_application()
         print("\n--- Loaded Configuration ---")
         print(app_state['config'])
-        print("--------------------------")
-    except (FileNotFoundError, yaml.YAMLError) as e:
-        print(f"Failed to bootstrap application: {e}") 
+    except Exception as e:
+        print(f"Bootstrap failed: {e}") 

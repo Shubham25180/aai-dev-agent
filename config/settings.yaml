@@ -1,20 +1,64 @@
+# AI Dev Agent Configuration
+
+# Paths
 paths:
-  memory: memory/
-  logs: logs/
-  undo: undo/
-  embeddings: memory/embeddings/
-  voice: voice/
-  utils: utils/
+  logs: logs
+  memory: memory
+  undo: undo
+  voice: voice
 
-features:
-  gui_fallback: true
-  voice_mode: false
-  undo_enabled: true
+# Logging configuration
+logging:
+  level: INFO
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name} | {message}"
+  file_rotation: "1 day"
+  file_retention: "30 days"
 
+# Planning configuration
+planning:
+  max_steps: 10
+  step_timeout: 300
+  strategy: sequential
+
+# Voice system configuration
+voice:
+  enabled: true
+  model_path: model
+  sample_rate: 16000
+  min_confidence: 0.6
+  tts_rate: 180
+  tts_volume: 1.0
+  auto_start: false
+  commands:
+    - pattern: "open (.+)"
+      command: "open_file"
+    - pattern: "run (.+)"
+      command: "run_command"
+    - pattern: "create (.+)"
+      command: "create_file"
+    - pattern: "delete (.+)"
+      command: "delete_file"
+    - pattern: "edit (.+)"
+      command: "edit_file"
+    - pattern: "undo"
+      command: "undo"
+    - pattern: "save"
+      command: "save"
+    - pattern: "quit|exit"
+      command: "exit"
+
+# Model configuration (for future LLM integration)
 model:
   provider: ollama
   model_name: deepseek-coder-v2:lite
-  endpoint: http://localhost:11434
-  max_tokens: 8192
+  temperature: 0.7
+  max_tokens: 2048
+
+# Safety settings
+safety:
+  require_confirmation: true
+  max_file_size: 10485760  # 10MB
+  allowed_extensions: [".py", ".js", ".html", ".css", ".json", ".yaml", ".txt", ".md"]
+  blocked_commands: ["rm -rf", "format c:", "del /s /q"]
 
 os_mode: auto  # auto, windows, linux, mac 
