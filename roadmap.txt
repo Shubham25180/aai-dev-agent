@@ -1,0 +1,89 @@
+==============================
+🗺️ DETAILED ROADMAP (Phase-wise)
+==============================
+
+PHASE 1: CORE FOUNDATION (WEEK 1)
+----------------------------------
+✅ Setup main.py as sole entry point.
+
+✅ Define strict modular file structure.
+
+✅ Implement core routing and planning modules:
+   - agents/planner.py
+   - app/router.py
+
+✅ Create basic execution modules:
+   - executor/shell_ops.py
+   - executor/gui_ops.py
+
+✅ Initialize:
+   - Logging to logs/actions/
+   - Summaries to logs/step_summaries.log
+   - Snapshots in undo/
+
+✅ Add strict inline commenting style for all functions.
+
+PHASE 2: MEMORY & STATE MANAGEMENT (WEEK 2)
+--------------------------------------------
+🔲 Implement:
+   - memory/short_term.json
+   - memory/long_term.json
+   - memory/core_behavior.json (preferences, traits)
+
+🔲 Build hook to update memory post-task.
+
+🔲 Enable planner to read memory context before planning.
+
+PHASE 3: VOICE SYSTEM INTEGRATION (WEEK 3)
+-------------------------------------------
+🔲 Build voice recognizer module (voice/recognizer.py) using Vosk or Whisper.
+
+🔲 Add TTS output module (voice/responder.py) using pyttsx3 or Microsoft Edge voice API.
+
+🔲 Implement voice command parser (voice/commands.py) to bridge voice to planner.
+
+🔲 Add confidence check to voice commands for verification before execution.
+
+PHASE 4: ADMIN EXECUTION MODE (WEEK 4)
+---------------------------------------
+🔲 Create secure prompt system for requesting elevated rights.
+
+🔲 Allow PowerShell/CMD execution with elevation (via subprocess or elevation tools).
+
+🔲 Isolate and label elevated commands in logs for auditing.
+
+PHASE 5: ROBUST UI AUTOMATION (WEEK 5)
+---------------------------------------
+🔲 Integrate pyautogui and pynput for full GUI fallback support.
+
+🔲 Implement:
+   - Mouse movement
+   - Keyboard input
+   - Window focus & element click
+
+🔲 Log all UI interactions with overlays or debug prints.
+
+🔲 Add UI interaction preview (dry-run or pre-confirmation).
+
+PHASE 6: NATURAL LANGUAGE + DEBUGGING TOOLS (WEEK 6)
+-----------------------------------------------------
+🔲 Integrate GPT-based task expansion in planner.py.
+
+🔲 Add real-time debugging interface:
+   - View command before execution
+   - Edit or override
+
+🔲 Create error classification and recovery mechanism:
+   - Save to logs/errors/
+   - Offer resolution suggestions
+
+PHASE 7: USER EXPERIENCE POLISHING (WEEK 7)
+--------------------------------------------
+🔲 Enhance speech feedback with tones and timing.
+
+🔲 Personality layer (relaxed, helpful vibe) added through language generation.
+
+🔲 Improve terminal/chat interface:
+   - Typing effect
+   - Progress indicators
+   - Cooldown timers or retries 

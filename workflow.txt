@@ -1,0 +1,40 @@
+==============================
+🔁 HIGH-LEVEL WORKFLOW OVERVIEW
+==============================
+
+1. **Session Start & Wake Phrase Recognition**
+   - Listens passively or via hotkey.
+   - Activates on user-defined wake phrase.
+   - Loads both short-term and long-term session memory.
+
+2. **Input Reception**
+   - Accepts commands via text or voice.
+   - Transcribes audio input using `voice/recognizer.py`.
+
+3. **Intent Parsing & Task Planning**
+   - Forwards input to `agents/planner.py` for analysis.
+   - Breaks down instructions into atomic tasks.
+   - Assigns execution type (CMD, PowerShell, UI, Admin).
+
+4. **Execution Routing**
+   - Uses `app/router.py` to direct tasks to the correct executor:
+     - `executor/shell_ops.py` for CMD/PowerShell commands
+     - `executor/gui_ops.py` for mouse/keyboard automation
+   - Requests admin access if required.
+
+5. **Logging, Snapshotting, and Validation**
+   - Saves before/after file snapshots in `undo/`.
+   - Logs all actions in JSON format to `logs/actions/`.
+   - Appends step summaries to `logs/step_summaries.log`.
+   - Validates each step after execution.
+
+6. **Conversational Feedback**
+   - Reports progress, results, or errors via terminal or `voice/responder.py`.
+
+7. **Memory Update**
+   - Updates session state in `memory/short_term.json`.
+   - Adds important context to `memory/long_term.json`.
+
+8. **Undo Availability**
+   - Records each step in `undo/history.json`.
+   - Supports rollback using `undo/undo_manager.py`.

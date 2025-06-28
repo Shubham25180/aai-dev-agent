@@ -1,0 +1,20 @@
+paths:
+  memory: memory/
+  logs: logs/
+  undo: undo/
+  embeddings: memory/embeddings/
+  voice: voice/
+  utils: utils/
+
+features:
+  gui_fallback: true
+  voice_mode: false
+  undo_enabled: true
+
+model:
+  provider: ollama
+  model_name: deepseek-coder-v2:lite
+  endpoint: http://localhost:11434
+  max_tokens: 8192
+
+os_mode: auto  # auto, windows, linux, mac 

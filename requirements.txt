@@ -1,0 +1,7 @@
+openai
+pyyaml
+loguru
+pyautogui
+SpeechRecognition
+whisper
+requests 
