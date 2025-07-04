@@ -18,9 +18,10 @@ import os
 
 # Import our existing components
 from .recognizer import Recognizer
-from .responder import Responder
+from .responder import Responder, TTSResponder
 from .commands import CommandProcessor
 from utils.logger import get_action_logger, get_error_logger
+from voice.faster_whisper_stt import FasterWhisperSTT
 
 @dataclass
 class AudioChunk:
@@ -50,7 +51,7 @@ class RealTimeVoiceSystem:
     5. 🔊 TTS Output Thread - Non-blocking speech synthesis
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], use_faster_whisper=True):
         self.config = config or {}
         self.logger = get_action_logger('realtime_voice')
         self.error_logger = get_error_logger('realtime_voice')
@@ -85,19 +86,26 @@ class RealTimeVoiceSystem:
             'commands_detected': 0,
             'llm_responses': 0,
             'tts_outputs': 0,
-            'avg_audio_latency': 0,
-            'avg_transcription_latency': 0,
-            'avg_llm_latency': 0,
-            'avg_tts_latency': 0
+            'avg_audio_latency': 0.0,
+            'avg_transcription_latency': 0.0,
+            'avg_llm_latency': 0.0,
+            'avg_tts_latency': 0.0
         }
+        self.start_time = time.time()
         
         # Wake word detection
-        self.wake_word = self.config.get('voice', {}).get('wake_word', 'nova')
+        self.wake_word = self.config.get('voice', {}).get('wake_word', 'nexus')
         self.wake_word_enabled = self.config.get('voice', {}).get('wake_word_enabled', True)
         
         # Voice activity detection
         self.vad_threshold = self.config.get('voice', {}).get('vad_threshold', 0.01)
         self.silence_duration = self.config.get('voice', {}).get('silence_duration', 1.0)
+        
+        self.use_faster_whisper = use_faster_whisper
+        if self.use_faster_whisper:
+            self.fw_stt = FasterWhisperSTT(model_size="base", device="cpu", compute_type="int8")
+        else:
+            self.fw_stt = None
         
         self.logger.info("RealTimeVoiceSystem initialized")
 
@@ -193,33 +201,49 @@ class RealTimeVoiceSystem:
             return False
 
     async def _initialize_components(self):
-        """Initialize voice processing components."""
+        print("[DEBUG] RealTimeVoiceSystem: Initializing components...")
         try:
-            # Initialize Whisper recognizer
+            self.logger.debug("Initializing Whisper recognizer...")
             voice_config = self.config.get('voice', {})
             self.recognizer = Recognizer(
                 model_size=voice_config.get('model_size', 'base.en'),
                 device=voice_config.get('device', 'cpu'),
                 compute_type=voice_config.get('compute_type', 'int8')
             )
-            
-            # Initialize TTS responder
-            self.responder = Responder(
-                rate=voice_config.get('tts_rate', 180),
-                volume=voice_config.get('tts_volume', 1.0)
-            )
-            
-            # Initialize command processor
+            print("[DEBUG] RealTimeVoiceSystem: Recognizer initialized.")
+            self.logger.debug("Recognizer initialized.")
+            try:
+                self.logger.debug("Attempting to initialize edge-tts TTSResponder...")
+                self.responder = TTSResponder(voice=voice_config.get('tts_voice', 'en-US-AvaNeural'))
+                self.logger.info("edge-tts TTSResponder initialized successfully")
+                print("[DEBUG] RealTimeVoiceSystem: edge-tts TTSResponder initialized successfully.")
+                # Startup test: speak a test message and log result
+                try:
+                    self.logger.info("[TTSResponder] Startup test: speaking test message...")
+                    print("[DEBUG] RealTimeVoiceSystem: TTSResponder startup test: speaking test message...")
+                    self.responder.speak("Edge TTS startup test: If you hear this, edge-tts is working.")
+                    self.logger.info("[TTSResponder] Startup test succeeded: edge-tts is working.")
+                    print("[DEBUG] RealTimeVoiceSystem: TTSResponder startup test succeeded.")
+                except Exception as e:
+                    self.logger.error(f"[TTSResponder] Startup test FAILED: {e}")
+                    print(f"[DEBUG] RealTimeVoiceSystem: TTSResponder startup test FAILED: {e}")
+            except Exception as e:
+                self.logger.error(f"edge-tts TTSResponder failed: {e}, falling back to Responder (pyttsx3)")
+                print(f"[DEBUG] RealTimeVoiceSystem: edge-tts TTSResponder failed: {e}, falling back to Responder (pyttsx3)")
+                self.responder = Responder(
+                    rate=voice_config.get('tts_rate', 180),
+                    volume=voice_config.get('tts_volume', 1.0)
+                )
+            print(f"[DEBUG] RealTimeVoiceSystem: TTS engine in use: {type(self.responder).__name__}")
+            self.logger.debug(f"TTS engine in use: {type(self.responder).__name__}")
             self.command_processor = CommandProcessor(
                 commands=voice_config.get('commands', [])
             )
-            
-            # Initialize LLM processor (will be set externally)
             self.llm_processor = None
-            
+            print("[DEBUG] RealTimeVoiceSystem: Voice components initialized successfully.")
             self.logger.info("Voice components initialized successfully")
-            
         except Exception as e:
+            print("[DEBUG] RealTimeVoiceSystem: Failed to initialize components:", e)
             self.error_logger.error(f"Failed to initialize components: {e}", exc_info=True)
             raise
 
@@ -228,33 +252,30 @@ class RealTimeVoiceSystem:
         self.llm_processor = llm_processor
 
     def _audio_input_loop(self):
-        """Thread 1: Continuous audio input streaming."""
+        print("[DEBUG] RealTimeVoiceSystem: Starting audio input thread...")
         try:
             self.logger.info("Audio input thread started")
-            
             def audio_callback(indata, frames, time, status):
-                """Audio callback for real-time streaming."""
                 if status:
                     self.logger.warning(f"Audio callback status: {status}")
-                
                 if self.is_running:
-                    # Create audio chunk
+                    self.logger.debug(f"[STT] Received audio chunk: shape={indata.shape}, frames={frames}, time={time}, dtype={indata.dtype}")
                     chunk = AudioChunk(
                         data=indata.copy(),
-                        timestamp=time.time(),
+                        timestamp=time.currentTime,
                         sample_rate=self.sample_rate,
                         duration=frames / self.sample_rate
                     )
-                    
-                    # Check for voice activity
-                    if self._detect_voice_activity(chunk.data):
+                    vad = self._detect_voice_activity(chunk.data)
+                    self.logger.debug(f"[STT] Voice activity detected: {vad}")
+                    if vad:
                         try:
                             self.audio_queue.put_nowait(chunk)
+                            print("[DEBUG] RealTimeVoiceSystem: Audio chunk queued for transcription.")
+                            self.logger.debug("[STT] Audio chunk queued for transcription.")
                             self.stats['audio_chunks_processed'] += 1
                         except queue.Full:
                             self.logger.warning("Audio queue full, dropping chunk")
-            
-            # Start audio stream
             with sd.InputStream(
                 callback=audio_callback,
                 channels=self.channels,
@@ -263,32 +284,48 @@ class RealTimeVoiceSystem:
                 dtype=np.float32
             ) as stream:
                 self.logger.info("Audio stream started")
-                
+                print("[DEBUG] RealTimeVoiceSystem: Audio stream started.")
                 while self.is_running:
-                    time.sleep(0.1)  # Small sleep to prevent busy waiting
-                
+                    time.sleep(0.1)
                 self.logger.info("Audio stream stopped")
-                
+                print("[DEBUG] RealTimeVoiceSystem: Audio stream stopped.")
         except Exception as e:
+            print("[DEBUG] RealTimeVoiceSystem: Audio input loop error:", e)
             self.error_logger.error(f"Audio input loop error: {e}", exc_info=True)
 
     def _transcription_loop(self):
-        """Thread 2: Live audio transcription."""
+        print("[DEBUG] RealTimeVoiceSystem: Starting transcription thread...")
         try:
             self.logger.info("Transcription thread started")
-            
             while self.is_running:
                 try:
-                    # Get audio chunk with timeout
                     chunk = self.audio_queue.get(timeout=1.0)
-                    
-                    start_time = time.time()
-                    
-                    # Transcribe audio chunk
-                    transcription = self.recognizer.transcribe_audio(chunk.data)
-                    
+                    print("[DEBUG] RealTimeVoiceSystem: Got audio chunk from queue.")
+                    self.logger.debug(f"[STT] Got audio chunk from queue: shape={chunk.data.shape}, duration={chunk.duration:.2f}s")
+                    stt_start = time.time()
+                    if self.use_faster_whisper and self.fw_stt:
+                        self.logger.info("[STT] Using FasterWhisperSTT for transcription.")
+                        segments = self.fw_stt.transcribe_buffer(chunk.data)
+                        self.logger.debug(f"[STT] FasterWhisperSTT segments: {segments}")
+                        transcription = {
+                            'text': " ".join([seg['text'] for seg in segments]),
+                            'confidence': sum([seg['confidence'] or 0 for seg in segments]) / max(1, len(segments)),
+                            'language': 'en',
+                        }
+                    else:
+                        if self.recognizer is not None:
+                            self.logger.info("[STT] Using Recognizer (Whisper) for transcription.")
+                            transcription = self.recognizer.recognize_once(duration=self.chunk_duration)
+                            self.logger.debug(f"[STT] Recognizer transcription: {transcription}")
+                        else:
+                            self.logger.warning("No recognizer available for fallback transcription.")
+                            transcription = {'text': '', 'confidence': 0.0, 'language': 'en'}
+                    stt_end = time.time()
+                    self.logger.info(f"[DEBUG] STT took {stt_end - stt_start:.2f} seconds")
                     if transcription and transcription.get('text', '').strip():
-                        # Create transcription result
+                        print(f"[DEBUG] RealTimeVoiceSystem: Transcription result: {transcription['text']}")
+                        self.logger.info(f"[STT] Transcription result: '{transcription['text']}' (conf: {transcription.get('confidence', 0.0):.2f})")
+                        llm_start = time.time()
                         result = TranscriptionResult(
                             text=transcription.get('text', '').strip(),
                             confidence=transcription.get('confidence', 0.0),
@@ -296,28 +333,30 @@ class RealTimeVoiceSystem:
                             timestamp=chunk.timestamp,
                             is_command=self._is_command(transcription.get('text', ''))
                         )
-                        
-                        # Add to transcription queue
                         try:
                             self.transcription_queue.put_nowait(result)
+                            print("[DEBUG] RealTimeVoiceSystem: Transcription result queued for command detection.")
+                            self.logger.debug("[STT] Transcription result queued for command detection.")
                             self.stats['transcriptions_completed'] += 1
-                            
-                            # Update latency stats
-                            latency = time.time() - start_time
+                            latency = time.time() - stt_start
                             self.stats['avg_transcription_latency'] = (
                                 (self.stats['avg_transcription_latency'] * (self.stats['transcriptions_completed'] - 1) + latency) 
                                 / self.stats['transcriptions_completed']
                             )
-                            
                         except queue.Full:
                             self.logger.warning("Transcription queue full, dropping result")
-                    
+                        llm_end = time.time()
+                        self.logger.info(f"[DEBUG] LLM took {llm_end - llm_start:.2f} seconds")
+                    else:
+                        print("[DEBUG] RealTimeVoiceSystem: Transcription result is empty or whitespace")
+                        self.logger.info("[STT] Transcription result is empty or whitespace")
                 except queue.Empty:
                     continue
                 except Exception as e:
-                    self.error_logger.error(f"Transcription error: {e}")
-                    
+                    print("[DEBUG] RealTimeVoiceSystem: Transcription error:", e)
+                    self.error_logger.error(f"Transcription error: {e}", exc_info=True)
         except Exception as e:
+            print("[DEBUG] RealTimeVoiceSystem: Transcription loop error:", e)
             self.error_logger.error(f"Transcription loop error: {e}", exc_info=True)
 
     def _command_detection_loop(self):
@@ -401,33 +440,37 @@ class RealTimeVoiceSystem:
         """Thread 5: Non-blocking TTS output."""
         try:
             self.logger.info("TTS output thread started")
-            
             while self.is_running:
                 try:
-                    # Get TTS request with timeout
                     tts_request = self.tts_queue.get(timeout=1.0)
-                    
-                    start_time = time.time()
-                    
-                    # Speak the response
-                    self.responder.speak(tts_request['text'])
-                    
+                    tts_start = time.time()
+                    self.logger.debug(f"TTS output loop: About to speak: {tts_request['text']}")
+                    try:
+                        self.logger.debug(f"Using TTS engine: {type(self.responder).__name__}")
+                        if self.responder is not None:
+                            self.responder.speak(tts_request['text'])
+                            self.logger.debug("TTS engine spoke successfully.")
+                        else:
+                            print("[DEBUG] RealTimeVoiceSystem: self.responder is None in TTS output loop!")
+                            self.logger.error("TTS responder is None in TTS output loop!")
+                    except Exception as e:
+                        self.logger.error(f"edge-tts TTS failed: {e}, falling back to Responder (pyttsx3)")
+                        fallback_responder = Responder()
+                        fallback_responder.speak(tts_request['text'])
+                        self.logger.debug("Fallback TTS engine spoke successfully.")
                     self.stats['tts_outputs'] += 1
-                    
-                    # Update latency stats
-                    latency = time.time() - start_time
+                    latency = time.time() - tts_start
                     self.stats['avg_tts_latency'] = (
                         (self.stats['avg_tts_latency'] * (self.stats['tts_outputs'] - 1) + latency) 
                         / self.stats['tts_outputs']
                     )
-                    
                     self.logger.info(f"TTS output: {tts_request['text'][:50]}...")
-                    
+                    tts_end = time.time()
+                    self.logger.info(f"[DEBUG] TTS took {tts_end - tts_start:.2f} seconds")
                 except queue.Empty:
                     continue
                 except Exception as e:
-                    self.error_logger.error(f"TTS output error: {e}")
-                    
+                    self.logger.error(f"TTS output error: {e}")
         except Exception as e:
             self.error_logger.error(f"TTS output loop error: {e}", exc_info=True)
 

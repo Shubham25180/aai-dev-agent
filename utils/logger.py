@@ -71,36 +71,46 @@ def setup_logger(
     
     return logger
 
-def get_action_logger(component: str) -> logging.Logger:
+def get_action_logger(component: str, subsystem: str = None) -> logging.Logger:
     """
     Get a logger specifically for agent actions with JSON formatting.
+    Accepts an optional 'subsystem' argument for compatibility.
+    Logs are chunked by subsystem, not by component.
     
     Args:
         component: Name of the component (e.g., 'llm_connector', 'planner')
+        subsystem: (Optional) Subsystem name (e.g., 'core', 'voice', 'gui')
         
     Returns:
         Logger configured for action logging
     """
-    log_file = os.path.join('logs', 'actions', f'{component}_actions.json')
+    if not subsystem:
+        subsystem = "core"
+    log_file = os.path.join('logs', 'actions', f'{subsystem}_actions.json')
     return setup_logger(
-        f'agent.actions.{component}',
+        f'agent.actions.{subsystem}',
         log_file=log_file,
         json_format=True
     )
 
-def get_error_logger(component: str) -> logging.Logger:
+def get_error_logger(component: str, subsystem: str = None) -> logging.Logger:
     """
     Get a logger specifically for error tracking.
+    Accepts an optional 'subsystem' argument for compatibility.
+    Logs are chunked by subsystem, not by component.
     
     Args:
         component: Name of the component
+        subsystem: (Optional) Subsystem name (e.g., 'core', 'voice', 'gui')
         
     Returns:
         Logger configured for error logging
     """
-    log_file = os.path.join('logs', 'errors', f'{component}_errors.log')
+    if not subsystem:
+        subsystem = "core"
+    log_file = os.path.join('logs', 'errors', f'{subsystem}_errors.log')
     return setup_logger(
-        f'agent.errors.{component}',
+        f'agent.errors.{subsystem}',
         log_file=log_file,
         level=logging.ERROR,
         json_format=False

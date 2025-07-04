@@ -1,40 +1,113 @@
-==============================
-🔁 HIGH-LEVEL WORKFLOW OVERVIEW
-==============================
+# 🧠 Agent Workflow & Architecture (Status: June 2025)
 
-1. **Session Start & Wake Phrase Recognition**
-   - Listens passively or via hotkey.
-   - Activates on user-defined wake phrase.
-   - Loads both short-term and long-term session memory.
+## 🚦 Status Overview
 
-2. **Input Reception**
-   - Accepts commands via text or voice.
-   - Transcribes audio input using `voice/recognizer.py`.
+| Layer/Feature                        | Status        | Notes/Next Steps                                  |
+|--------------------------------------|--------------|---------------------------------------------------|
+| Voice transcription (VAD + Whisper)  | ✅ DONE       | Stable, integrated                                |
+| Wake word detection                  | ✅ DONE       | Integrated                                        |
+| GUI recording/logger                 | ✅ DONE       | Integrated with modular memory layer              |
+| Memory logging (SQLite + JSON)       | ✅ DONE       | Modular memory (Core, Session, Long-Term) in use  |
+| Scheduled summarization trigger      | ✅ DONE       | Session/periodic summarization                    |
+| Session state handling               | ✅ DONE       | Start/stop/resume supported                       |
+| Intent detection (text)              | ⏳ IN PROGRESS| Rule-based/regex, CPU-only                        |
+| LLM prompt routing + timeout logic   | ✅ DONE       | Timeout/session logic in place                    |
+| Memory summarization by LLM          | ✅ DONE       | Summarization prompt implemented                  |
+| Feedback loop for prompt tuning      | ⏳ PLANNED    | Log mismatches, repeated requests, user feedback  |
+| Prompt auto-tuning                   | ⏳ PLANNED    | Use feedback loop to refine prompts               |
+| Track prompt-response mismatch       | ⏳ PLANNED    | Build scoring/logging system                      |
+| Emotion/sentiment analysis           | ⏳ IN PROGRESS| TextBlob/VADER, CPU-only                          |
+| Speaker detection                    | ⏳ PLANNED    | For multi-user, diarization                       |
+| Mood-based/ambient responses         | ⏳ PLANNED    | Rule engine for friendly/ambient behaviors        |
+| Continual learning/adaptation        | 🔲 FUTURE     | Long-term, research-level                         |
 
-3. **Intent Parsing & Task Planning**
-   - Forwards input to `agents/planner.py` for analysis.
-   - Breaks down instructions into atomic tasks.
-   - Assigns execution type (CMD, PowerShell, UI, Admin).
+---
 
-4. **Execution Routing**
-   - Uses `app/router.py` to direct tasks to the correct executor:
-     - `executor/shell_ops.py` for CMD/PowerShell commands
-     - `executor/gui_ops.py` for mouse/keyboard automation
-   - Requests admin access if required.
+## 🧩 Modular Architecture (Organs, Brain, Feedback)
 
-5. **Logging, Snapshotting, and Validation**
-   - Saves before/after file snapshots in `undo/`.
-   - Logs all actions in JSON format to `logs/actions/`.
-   - Appends step summaries to `logs/step_summaries.log`.
-   - Validates each step after execution.
+- **Ear:** Whisper, VAD (voice to text, silence detection) — **DONE**
+- **Speech Emotion:** TextBlob/VADER (CPU-only) — **IN PROGRESS**
+- **Vision/GUI:** PyAutoGUI, screen logger — **DONE/BASIC**
+- **Memory:** SQLite, JSON, ChromaDB — **DONE** (Core, Session, Long-Term fully integrated)
+- **Mood:** Mood-state tracker (rule-based, to be expanded) — **PLANNED**
+- **Feedback:** Log user/LLM interaction, prompt success/failure — **PLANNED**
 
-6. **Conversational Feedback**
-   - Reports progress, results, or errors via terminal or `voice/responder.py`.
+### Brain (Python Orchestrator)
+- Receives signals from all organs
+- Maintains session state (mood, topic, history)
+- Decides when to:
+  - Call LLM (wake word, intent, memory trigger)
+  - Log/wait (ambient)
+  - Give emotional comfort (emotion detected)
+- Beautifies and personalizes LLM output before TTS/GUI
+- Writes logs to long-term memory
+- Schedules self-analysis (summarization, prompt tuning)
 
-7. **Memory Update**
-   - Updates session state in `memory/short_term.json`.
-   - Adds important context to `memory/long_term.json`.
+### Feedback & Learning
+- Logs all interactions, user feedback, and outcomes
+- Feedback loop for prompt tuning and adaptation (planned)
+- Scheduled self-analysis and rule updates (planned)
 
-8. **Undo Availability**
-   - Records each step in `undo/history.json`.
-   - Supports rollback using `undo/undo_manager.py`.
+---
+
+## 🚀 Next-Level Enhancements (CPU-Only, 2025+)
+
+| Feature Area                | Status        | Next Steps / Tools / Notes                                  |
+|----------------------------|--------------|-------------------------------------------------------------|
+| Adaptive Personality       | PLANNED      | Persona/tone via memory, user feedback, no GPU models       |
+| Real-Time Turn Management  | PLANNED      | VAD-based interruption, smart silence (CPU-only logic)      |
+| Knowledge Embedding + RAG  | PLANNED      | ChromaDB/LlamaIndex (CPU), context injection                |
+| Multi-Agent/Tool Use       | PLANNED      | Agent router, autonomous tool use (Python logic)            |
+| RLHF-lite Feedback Loop    | PLANNED      | User ratings, prompt refinement, analytics dashboard        |
+| Biometrics & Empathy       | PLANNED      | TextBlob/VADER for sentiment, no deep models                |
+| Modular Brain-as-OS        | PLANNED      | Organs as modules, self-management, model orchestration     |
+
+---
+
+## 🧠 Stepwise Implementation Plan (CPU-Only)
+
+1. **Prompt Feedback & Analytics**
+   - Log every prompt, user edit, and LLM result
+   - Add feedback (👍/👎, edit & resend) in GUI
+   - Store feedback in memory for analytics
+2. **Rule-Based Intent & Mood Detection**
+   - Use keyword/regex for intent
+   - Use TextBlob/VADER for sentiment (text only)
+3. **Memory-Driven Adaptation**
+   - Use session/long-term memory to remember user preferences, successful prompts, and feedback
+4. **Knowledge Search (RAG)**
+   - Use ChromaDB/LlamaIndex for document/context retrieval (CPU)
+5. **Persona/Style Switching**
+   - Let user pick persona/tone in GUI; use templates/rules to adjust responses
+6. **Modular, Extensible Design**
+   - All organs (memory, rules, feedback, GUI, etc.) modular and swappable
+
+---
+
+## 🧬 Unified System Flow (CPU-Only)
+
+1. **Input**: Voice (VAD/Whisper), GUI, or external event (all CPU)
+2. **Preprocessing**: Rule-based emotion/tone/intent detection, persona/context tagging
+3. **Decision**:
+   - If brain can handle: use rules/memory/templates
+   - If not: generate/refine prompt, show for feedback/edit
+   - If approved: call LLM (CPU-only, or remote/cloud if needed)
+4. **LLM Call**: Routed to best model/agent/tool (CPU-only)
+5. **Postprocessing**: Brain beautifies, personalizes, and formats response
+6. **Output**: TTS, GUI, log, or tool action
+7. **Feedback**: User rates/edits, feedback logged
+8. **Learning**: Self-analysis, prompt/rule updates, persona/tone adaptation
+
+---
+
+## 📋 Immediate Focus (CPU-Only)
+- [ ] Prompt feedback loop & analytics (GUI + memory)
+- [ ] Rule-based intent/mood detection (regex, TextBlob, VADER)
+- [ ] Memory-driven adaptation
+- [ ] Knowledge search (ChromaDB/LlamaIndex)
+- [ ] Persona/style switching (GUI + templates)
+- [ ] Modularize all organs for easy extension
+
+---
+
+**All features and enhancements are designed to run efficiently on CPU-only systems. No GPU-required models are used for intent, mood, or core agent logic.**

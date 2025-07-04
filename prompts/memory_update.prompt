@@ -1,0 +1,13 @@
+Summarize the following interaction in a memory-friendly format.
+This summary will be added to long-term memory for future sessions.
+
+Interaction:
+User: "{{user_input}}"
+nexus: "{{nexus_response}}"
+
+Output Format:
+[MemoryUpdate]
+- Topic: ...
+- Intent: ...
+- Emotional tone: ...
+- Important facts: ... 

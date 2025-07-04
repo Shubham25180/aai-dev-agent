@@ -1,0 +1,15 @@
+Command received: "{{user_input}}"
+
+Interpret this as a high-level task and return a JSON describing:
+- The steps to perform using automation tools (mouse, keyboard, web)
+- Parameters required (URL, file name, text, app name)
+
+Example:
+{
+  "steps": [
+    {"action": "open_app", "target": "Google Chrome"},
+    {"action": "navigate", "target": "https://github.com"},
+    {"action": "click", "target": "Sign In"},
+    {"action": "type", "target": "username", "text": "{{from_memory.credentials.username}}"}
+  ]
+} 

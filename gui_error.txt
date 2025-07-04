@@ -1,0 +1,34 @@
+C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\ctranslate2\__init__.py:8: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Traceback (most recent call last):
+  File "C:\java\som\som\medhavi shekhar\linux\ai_dev_agent\gui\nexus_gui.py", line 28, in <module>
+    from app.bootstrap import Bootstrap
+  File "C:\java\som\som\medhavi shekhar\linux\ai_dev_agent\app\bootstrap.py", line 11, in <module>
+    from voice.voice_system import VoiceSystem
+  File "C:\java\som\som\medhavi shekhar\linux\ai_dev_agent\voice\voice_system.py", line 7, in <module>
+    from .recognizer import Recognizer
+  File "C:\java\som\som\medhavi shekhar\linux\ai_dev_agent\voice\recognizer.py", line 6, in <module>
+    from faster_whisper import WhisperModel
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\faster_whisper\__init__.py", line 2, in <module>
+    from faster_whisper.transcribe import BatchedInferencePipeline, WhisperModel
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\faster_whisper\transcribe.py", line 13, in <module>
+    import ctranslate2
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\ctranslate2\__init__.py", line 55, in <module>
+    from ctranslate2 import converters, models, specs
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\ctranslate2\converters\__init__.py", line 8, in <module>
+    from ctranslate2.converters.transformers import TransformersConverter
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\ctranslate2\converters\transformers.py", line 14, in <module>
+    import transformers
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\transformers\__init__.py", line 1018, in <module>
+    import_structure = define_import_structure(Path(__file__).parent / "models", prefix="models")
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\transformers\utils\import_utils.py", line 2594, in define_import_structure
+    import_structure = create_import_structure_from_path(module_path)
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\transformers\utils\import_utils.py", line 2307, in create_import_structure_from_path
+    import_structure[f] = create_import_structure_from_path(os.path.join(module_path, f))
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\shubh\AppData\Roaming\Python\Python313\site-packages\transformers\utils\import_utils.py", line 2331, in create_import_structure_from_path
+    with open(os.path.join(directory, module_name), encoding="utf-8") as f:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen codecs>", line 312, in __init__
+KeyboardInterrupt
+^C

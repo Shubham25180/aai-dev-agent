@@ -28,6 +28,7 @@ class Recognizer:
     def _load_model(self):
         """Load Whisper model with specified configuration."""
         try:
+            print("[DEBUG] Recognizer: Loading Whisper model...", self.model_size, self.device)
             self.logger.info(f"Loading Whisper model: {self.model_size} on {self.device}")
             self.model = WhisperModel(
                 model_size_or_path=self.model_size,
@@ -36,8 +37,10 @@ class Recognizer:
                 download_root=None,  # Use default cache directory
                 local_files_only=False  # Allow download if not cached
             )
+            print("[DEBUG] Recognizer: Whisper model loaded successfully.")
             self.logger.info(f"Whisper {self.model_size} model loaded successfully")
         except Exception as e:
+            print("[DEBUG] Recognizer: Failed to load Whisper model:", e)
             self.error_logger.error(f"Failed to load Whisper model: {e}")
             raise
 
@@ -52,25 +55,30 @@ class Recognizer:
     def start(self):
         """Start real-time speech recognition."""
         if not self.model:
+            print("[DEBUG] Recognizer: Model not loaded in start()!")
             self.logger.error("Whisper model not loaded")
             return False
-        
+        print("[DEBUG] Recognizer: Starting recognition thread...")
         self.running = True
         self.thread = threading.Thread(target=self._recognize_loop)
         self.thread.daemon = True
         self.thread.start()
         self.logger.info("Real-time speech recognition started")
+        print("[DEBUG] Recognizer: Recognition thread started.")
         return True
 
     def stop(self):
         """Stop speech recognition."""
+        print("[DEBUG] Recognizer: Stopping recognition...")
         self.running = False
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2.0)
         self.logger.info("Speech recognition stopped")
+        print("[DEBUG] Recognizer: Recognition stopped.")
 
     def _recognize_loop(self):
         """Main recognition loop for real-time processing."""
+        print("[DEBUG] Recognizer: Entered recognition loop.")
         try:
             with sd.InputStream(
                 samplerate=self.sample_rate,
@@ -80,15 +88,18 @@ class Recognizer:
                 callback=self._audio_callback
             ):
                 self.logger.info("Audio stream started")
+                print("[DEBUG] Recognizer: Audio stream started.")
                 while self.running:
                     try:
                         # Process audio in chunks
                         audio_chunk = self.audio_queue.get(timeout=1.0)
+                        print("[DEBUG] Recognizer: Got audio chunk.")
                         # For real-time, we'd need to implement buffering
                         # This is a simplified version
                     except queue.Empty:
                         continue
         except Exception as e:
+            print("[DEBUG] Recognizer: Recognition loop error:", e)
             self.error_logger.error(f"Recognition loop error: {e}")
 
     def recognize_once(self, duration=5.0) -> dict:

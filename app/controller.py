@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 from utils.logger import get_action_logger, get_error_logger
 from agents.planner import Planner
-from agents.llm_connector import LLMConnector
 from app.router import Router
 
 class Controller:
@@ -14,7 +13,7 @@ class Controller:
     Follows AGENT_MANIFEST.md principles for automatic control and memory management.
     """
     
-    def __init__(self, config: Dict[str, Any], router=None, planner=None, memory_manager=None):
+    def __init__(self, config: Dict[str, Any], router=None, planner=None, memory=None):
         """
         Initialize Controller with all required components.
         
@@ -22,16 +21,16 @@ class Controller:
             config: Application configuration
             router: Router instance for task execution
             planner: Planner instance for task planning
-            memory_manager: MemoryManager instance for memory operations
+            memory: Memory instance for memory operations
         """
         self.config = config
-        self.logger = get_action_logger('controller')
-        self.error_logger = get_error_logger('controller')
+        self.logger = get_action_logger('controller', subsystem='core')
+        self.error_logger = get_error_logger('controller', subsystem='core')
         
         # Core components
         self.router = router
         self.planner = planner
-        self.memory_manager = memory_manager
+        self.memory = memory
         
         # Controller state
         self.current_task = None
@@ -39,8 +38,8 @@ class Controller:
         self.execution_history = []
         self.session_start = datetime.utcnow()
         
-        # Setup memory hooks if memory manager is available
-        if self.memory_manager:
+        # Setup memory hooks if memory is available
+        if self.memory:
             self._setup_memory_hooks()
         
         self.logger.info("Controller initialized with memory integration")
@@ -49,10 +48,7 @@ class Controller:
         """
         Setup memory update hooks for automatic memory management.
         """
-        if self.memory_manager:
-            # Hook for task completion
-            self.memory_manager.add_update_hook(self._on_memory_update)
-            self.logger.info("Memory hooks configured")
+        self.logger.info("Memory hooks configured")
 
     def _on_memory_update(self, memory_type: str, key: str, value: Any):
         """
@@ -63,20 +59,9 @@ class Controller:
             key: Memory key
             value: Updated value
         """
-        try:
-            self.logger.info(f"Memory update received", 
-                           extra={'memory_type': memory_type, 'key': key})
-            
-            # Update controller state based on memory changes
-            if memory_type == 'short_term' and key == 'current_plan':
-                self.current_plan = value
-            elif memory_type == 'short_term' and key == 'task_status':
-                self._handle_task_status_update(value)
-                
-        except Exception as e:
-            self.error_logger.error(f"Failed to handle memory update: {e}")
+        pass
 
-    def process_task(self, task: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    def process_task(self, task: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Process a task through the complete workflow: plan → execute → memory update.
         
@@ -89,15 +74,13 @@ class Controller:
         """
         try:
             self.logger.info("Starting task processing", extra={'task': task})
-            
-            # Update memory with new task
-            if self.memory_manager:
-                self.memory_manager.update_short_term('current_task', {
+            if self.memory:
+                event = {
                     'task': task,
                     'started_at': datetime.utcnow().isoformat() + 'Z',
                     'context': context or {}
-                })
-            
+                }
+                self.memory.session.add_chunk("New task started", json.dumps(event))
             self.current_task = task
             
             # Step 1: Create plan
@@ -125,7 +108,7 @@ class Controller:
             self.error_logger.error(f"Task processing failed: {e}")
             return self._create_error_result("Task processing failed", str(e))
 
-    def _create_plan(self, task: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    def _create_plan(self, task: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Create execution plan for the task.
         
@@ -141,9 +124,9 @@ class Controller:
                 return {'success': False, 'error': 'Planner not available'}
             
             # Get memory context for planning
-            memory_context: Optional[Dict[str, Any]] = None
-            if self.memory_manager:
-                memory_context = self.memory_manager.get_memory_context()
+            memory_context = None
+            if self.memory:
+                memory_context = self.memory.get_memory_stats()
             
             # Create plan
             plan = self.planner.create_plan(task, context or {})
@@ -154,13 +137,14 @@ class Controller:
             self.current_plan = plan
             
             # Update memory with plan
-            if self.memory_manager:
-                self.memory_manager.update_short_term('current_plan', {
+            if self.memory:
+                event = {
                     'plan_id': plan['plan_id'],
                     'task': task,
                     'status': 'created',
                     'step_count': len(plan.get('steps', []))
-                })
+                }
+                self.memory.session.add_chunk("Plan created", json.dumps(event))
             
             return {'success': True, 'plan': plan}
             
@@ -256,8 +240,8 @@ class Controller:
             step['result'] = result
             
             # Update memory with step result
-            if self.memory_manager:
-                self.memory_manager.update_short_term(f'step_{step_id}_result', {
+            if self.memory:
+                self.memory.session.add_chunk(f'step_{step_id}_result', {
                     'step_id': step_id,
                     'action': action,
                     'module': module,
@@ -302,28 +286,31 @@ class Controller:
             execution_result: Execution results
         """
         try:
-            if not self.memory_manager:
+            if not self.memory:
                 return
             
-            # Update short-term memory with task completion
-            self.memory_manager.update_short_term('task_completion', {
+            # Store session completion event
+            event = {
                 'task': task,
                 'plan_id': plan.get('plan_id'),
                 'success': execution_result.get('success', False),
                 'total_steps': execution_result.get('total_steps', 0),
                 'completed_steps': execution_result.get('completed_steps', 0),
                 'completed_at': datetime.utcnow().isoformat() + 'Z'
-            })
+            }
+            self.memory.session.add_chunk("Task completed", json.dumps(event))
             
-            # Update long-term memory with task summary
+            # Store to long-term memory if successful
             if execution_result.get('success', False):
-                self.memory_manager.update_long_term('successful_tasks', {
+                meta = {
                     'task': task,
                     'plan_id': plan.get('plan_id'),
                     'task_type': plan.get('metadata', {}).get('complexity', 'unknown'),
                     'steps_completed': execution_result.get('completed_steps', 0),
                     'completed_at': datetime.utcnow().isoformat() + 'Z'
-                })
+                }
+                summary = f"Task: {task}\nPlan: {plan}\nResult: {execution_result}"
+                self.memory.long_term.add_memory(summary, metadata=meta)
             
             # Update core behavior with patterns
             self._update_behavior_patterns(task, plan, execution_result)
@@ -342,29 +329,19 @@ class Controller:
             execution_result: Execution results
         """
         try:
-            if not self.memory_manager:
+            if not self.memory:
                 return
             
-            # Extract patterns from successful executions
+            # Example: update session with behavior pattern
             if execution_result.get('success', False):
                 task_type = plan.get('metadata', {}).get('complexity', 'medium')
                 step_count = len(plan.get('steps', []))
-                
-                # Update task type patterns
-                current_patterns = self.memory_manager.get_core_behavior('task_patterns', {})
-                if not isinstance(current_patterns, dict):
-                    current_patterns = {}
-                
-                if task_type not in current_patterns:
-                    current_patterns[task_type] = {'count': 0, 'avg_steps': 0}
-                
-                current_patterns[task_type]['count'] += 1
-                current_patterns[task_type]['avg_steps'] = (
-                    (current_patterns[task_type]['avg_steps'] * (current_patterns[task_type]['count'] - 1) + step_count) 
-                    / current_patterns[task_type]['count']
-                )
-                
-                self.memory_manager.update_core_behavior('task_patterns', current_patterns)
+                event = {
+                    'task_type': task_type,
+                    'step_count': step_count,
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                }
+                self.memory.session.add_chunk("Behavior pattern updated", json.dumps(event))
                 
                 # Update user preferences
                 self._update_user_preferences(task, plan, execution_result)
@@ -383,22 +360,17 @@ class Controller:
             execution_result: Execution results
         """
         try:
-            if not self.memory_manager:
+            if not self.memory:
                 return
             
             # Extract user preferences from context
             user_context = plan.get('user_context', {})
             if user_context:
-                current_preferences = self.memory_manager.get_core_behavior('user_preferences', {})
-                if not isinstance(current_preferences, dict):
-                    current_preferences = {}
-                
-                # Update preferences based on context
-                for key, value in user_context.items():
-                    if key in ['safety_level', 'verbose_logging', 'preferences']:
-                        current_preferences[key] = value
-                
-                self.memory_manager.update_core_behavior('user_preferences', current_preferences)
+                event = {
+                    'user_preferences': user_context,
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                }
+                self.memory.session.add_chunk("User preferences updated", json.dumps(event))
                 
         except Exception as e:
             self.error_logger.error(f"Failed to update user preferences: {e}")
@@ -512,21 +484,21 @@ class Controller:
         except Exception:
             return 0
 
-    def set_components(self, router=None, planner=None, memory_manager=None):
+    def set_components(self, router=None, planner=None, memory=None):
         """
         Set or update controller components.
         
         Args:
             router: Router instance
             planner: Planner instance
-            memory_manager: MemoryManager instance
+            memory: Memory instance
         """
         if router:
             self.router = router
         if planner:
             self.planner = planner
-        if memory_manager:
-            self.memory_manager = memory_manager
+        if memory:
+            self.memory = memory
             self._setup_memory_hooks()
         
         self.logger.info("Controller components updated")
@@ -539,7 +511,7 @@ class Controller:
             True if successful, False otherwise
         """
         try:
-            if not self.memory_manager:
+            if not self.memory:
                 return False
             
             session_state = {
@@ -550,7 +522,7 @@ class Controller:
                 'saved_at': datetime.utcnow().isoformat() + 'Z'
             }
             
-            self.memory_manager.update_short_term('session_state', session_state)
+            self.memory.session.add_chunk("Session state saved", json.dumps(session_state))
             return True
             
         except Exception as e:

@@ -1,35 +1,87 @@
+# nexus AI Dev Agent - Unified Requirements
+# Core dependencies for all features including voice, LLM, and GUI
+
 # Core dependencies
 pyyaml>=6.0
 requests>=2.28.0
-
-# Logging and utilities
 colorama>=0.4.5
 
-# Voice system dependencies - Whisper for multi-language support
+# Voice system dependencies
 faster-whisper>=0.9.0
 sounddevice>=0.4.6
 pyttsx3>=2.90
 numpy>=1.21.0
+webrtcvad>=2.0.10
+pyaudio>=0.2.11
 
-# Hugging Face integration
+# LLM and AI dependencies
 transformers>=4.35.0
 torch>=2.0.0
 accelerate>=0.24.0
 tokenizers>=0.15.0
 huggingface-hub>=0.19.0
+ollama>=0.1.7
+gpt4all>=2.0.2
+llama-cpp-python>=0.2.20
 
-# Streamlit for Hugging Face Spaces
+# GUI dependencies
+PyQt6>=6.0.0
 streamlit>=1.28.0
 
-# Performance monitoring
-psutil>=5.9.0
+# GUI automation dependencies
+pyautogui>=0.9.54
+pynput>=1.7.6
+pytesseract>=0.3.10
+ultralytics>=8.0.0
+Pillow>=9.0.0
 
-# Optional: For enhanced voice recognition (fallback)
+# Performance and monitoring
+psutil>=5.9.0
+asyncio>=3.4.3
+aiofiles>=23.2.1
+aiohttp>=3.9.1
+
+# File operations and utilities
+orjson>=3.9.10
+pandas>=2.1.0
+structlog>=23.2.0
+
+# Development and testing
+mypy>=1.7.0
+black>=23.11.0
+flake8>=6.1.0
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Optional: GPU acceleration (uncomment if needed)
+# torch>=2.1.0+cu118  # CUDA 11.8
+# torch>=2.1.0+cu121  # CUDA 12.1
+
+# Optional: Advanced audio processing
+librosa>=0.10.1
+soundfile
+
+# Optional: Web interface
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=12.0
+
+# Optional: Enhanced voice recognition (fallback)
 # vosk>=0.3.45
 
-# GUI automation (for future phases)
-# pyautogui>=0.9.54
-# pynput>=1.7.6
+# Optional: External LLM APIs
+# openai>=1.0.0
 
-# LLM connectors (for future phases)
-# openai>=1.0.0 
+edge-tts
+
+# NLP and intent/emotion detection
+spacy>=3.0.0
+textblob>=0.17.1
+# Note: After installing spacy, run: python -m spacy download en_core_web_sm
+
+# Memory and embeddings
+chromadb>=0.4.22
+sentence-transformers>=2.2.2
+
+# New GUI dependency
+nicegui>=1.3.17 

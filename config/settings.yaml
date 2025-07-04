@@ -63,3 +63,8 @@ safety:
   blocked_commands: ["rm -rf", "format c:", "del /s /q"]
 
 os_mode: auto # auto, windows, linux, mac
+
+# Feature toggles for optional modules
+features:
+  intent_detection: false
+  emotion_detection: false

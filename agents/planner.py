@@ -20,8 +20,8 @@ class Planner:
             memory_manager: Optional MemoryManager instance for context-aware planning
         """
         self.config = config
-        self.logger = get_action_logger('planner')
-        self.error_logger = get_error_logger('planner')
+        self.logger = get_action_logger('planner', subsystem='core')
+        self.error_logger = get_error_logger('planner', subsystem='core')
         self.memory_manager = memory_manager
         
         # Planning configuration

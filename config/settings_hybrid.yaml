@@ -21,50 +21,27 @@ llm:
   # Model selection strategy
   model_type: "hybrid" # hybrid, ollama, huggingface
   provider: "hybrid" # hybrid, ollama, huggingface
+  model_name: "llama3.2:3b" # Set to match your available Ollama model
 
   # Routing configuration
   routing:
     default_backend: "ollama" # Default for unknown tasks
-
-    # Keywords that force Ollama (coding tasks)
-    coding_keywords:
-      - "code"
-      - "function"
-      - "class"
-      - "algorithm"
-      - "debug"
-      - "refactor"
-      - "implement"
-      - "optimize"
-      - "architecture"
-      - "design pattern"
-      - "write"
-      - "create"
-      - "generate"
-      - "solve"
-      - "fix"
-      - "improve"
-      - "review"
-      - "analyze"
-      - "test"
-      - "documentation"
-
-    # Keywords that use Hugging Face (simple tasks)
-    simple_keywords:
-      - "hello"
-      - "hi"
-      - "how are you"
-      - "what is"
-      - "explain briefly"
-      - "quick"
-      - "simple"
-      - "basic"
-      - "help"
-      - "assist"
-      - "weather"
-      - "time"
-      - "date"
-      - "status"
+    # Remove or comment out simple_keywords to force all prompts to Ollama
+    # simple_keywords:
+    #   - "hello"
+    #   - "hi"
+    #   - "how are you"
+    #   - "what is"
+    #   - "explain briefly"
+    #   - "quick"
+    #   - "simple"
+    #   - "basic"
+    #   - "help"
+    #   - "assist"
+    #   - "weather"
+    #   - "time"
+    #   - "date"
+    #   - "status"
 
     # Keywords that force Ollama (complex tasks)
     force_ollama:
@@ -162,7 +139,7 @@ voice:
   silence_duration: 1.0 # seconds of silence to consider end of speech
 
   # Wake word settings
-  wake_word: "nova"
+  wake_word: "nexus"
   wake_word_enabled: true
 
   # Multi-threading settings

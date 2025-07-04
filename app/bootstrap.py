@@ -1,14 +1,16 @@
 import os
 import sys
 import yaml
+import json
 from typing import Dict, Any
 from utils.logger import get_action_logger, get_error_logger
-from memory.memory_manager import MemoryManager
 from agents.planner import Planner
 from app.router import Router
 from app.controller import Controller
 from app.voice_handler import VoiceCommandHandler
 from voice.voice_system import VoiceSystem
+from memory.memory_layer import MemoryLayer
+from datetime import datetime
 
 class Bootstrap:
     """
@@ -25,12 +27,12 @@ class Bootstrap:
             config_path: Path to configuration file
         """
         self.config_path = config_path
-        self.logger = get_action_logger('bootstrap')
-        self.error_logger = get_error_logger('bootstrap')
+        self.logger = get_action_logger('bootstrap', subsystem='core')
+        self.error_logger = get_error_logger('bootstrap', subsystem='core')
         
         # Core components
         self.config = {}
-        self.memory_manager = None
+        self.memory = None
         self.planner = None
         self.router = None
         self.controller = None
@@ -102,70 +104,23 @@ class Bootstrap:
         except Exception as e:
             self.error_logger.error(f"Failed to create directories: {e}")
 
-    def initialize_memory_manager(self) -> bool:
+    def initialize_memory(self) -> bool:
         """
-        Initialize the memory management system.
-        
+        Initialize the new modular memory system.
         Returns:
             True if successful, False otherwise
         """
         try:
-            self.memory_manager = MemoryManager(self.config)
-            
-            # Initialize memory with default values
-            self._initialize_default_memory()
-            
-            self.logger.info("Memory manager initialized successfully")
+            self.memory = MemoryLayer(
+                core_path="memory/core_behavior.json",
+                session_db="memory/session/session_" + datetime.utcnow().strftime('%Y-%m-%dT%H-%M') + ".sqlite",
+                long_term_dir="memory/long_term/chroma_db"
+            )
+            self.logger.info("MemoryLayer initialized successfully")
             return True
-            
         except Exception as e:
-            self.error_logger.error(f"Failed to initialize memory manager: {e}")
+            self.error_logger.error(f"Failed to initialize MemoryLayer: {e}")
             return False
-
-    def _initialize_default_memory(self):
-        """
-        Initialize memory with default values and patterns.
-        """
-        try:
-            if not self.memory_manager:
-                return
-            
-            # Initialize core behavior with default patterns
-            default_behavior = {
-                'task_patterns': {},
-                'user_preferences': {
-                    'safety_level': 'normal',
-                    'verbose_logging': False,
-                    'auto_confirm': False
-                },
-                'workflow_patterns': {
-                    'preferred_modules': ['file_ops', 'code_editor'],
-                    'avoided_operations': ['delete', 'format'],
-                    'safety_checks': True
-                }
-            }
-            
-            for key, value in default_behavior.items():
-                if not self.memory_manager.get_core_behavior(key):
-                    self.memory_manager.update_core_behavior(key, value)
-            
-            # Initialize long-term memory with system info
-            system_info = {
-                'system_info': {
-                    'platform': os.name,
-                    'python_version': sys.version,
-                    'initialized_at': self.memory_manager.get_core_behavior('initialized_at', '')
-                }
-            }
-            
-            for key, value in system_info.items():
-                if not self.memory_manager.get_long_term(key):
-                    self.memory_manager.update_long_term(key, value)
-            
-            self.logger.info("Default memory initialized")
-            
-        except Exception as e:
-            self.error_logger.error(f"Failed to initialize default memory: {e}")
 
     def initialize_planner(self) -> bool:
         """
@@ -175,14 +130,11 @@ class Bootstrap:
             True if successful, False otherwise
         """
         try:
-            if not self.memory_manager:
-                self.error_logger.error("Memory manager not initialized")
+            if not self.memory:
+                self.error_logger.error("Memory not initialized")
                 return False
             
-            self.planner = Planner(self.config, self.memory_manager)
-            
-            # Set memory manager in planner
-            self.planner.set_memory_manager(self.memory_manager)
+            self.planner = Planner(self.config, memory_manager=self.memory)
             
             self.logger.info("Planner initialized with memory integration")
             return True
@@ -216,7 +168,7 @@ class Bootstrap:
             True if successful, False otherwise
         """
         try:
-            if not all([self.memory_manager, self.planner, self.router]):
+            if not all([self.memory, self.planner, self.router]):
                 self.error_logger.error("Required components not initialized")
                 return False
             
@@ -224,7 +176,7 @@ class Bootstrap:
                 config=self.config,
                 router=self.router,
                 planner=self.planner,
-                memory_manager=self.memory_manager
+                memory=self.memory
             )
             
             self.logger.info("Controller initialized with all components")
@@ -286,9 +238,9 @@ class Bootstrap:
             if not self.load_configuration():
                 return {'success': False, 'error': 'Failed to load configuration'}
             
-            # Step 2: Initialize memory manager
-            if not self.initialize_memory_manager():
-                return {'success': False, 'error': 'Failed to initialize memory manager'}
+            # Step 2: Initialize memory
+            if not self.initialize_memory():
+                return {'success': False, 'error': 'Failed to initialize memory'}
             
             # Step 3: Initialize planner
             if not self.initialize_planner():
@@ -307,18 +259,18 @@ class Bootstrap:
                 return {'success': False, 'error': 'Failed to initialize voice system'}
             
             # Step 7: Update memory with bootstrap completion
-            if self.memory_manager:
-                self.memory_manager.update_short_term('bootstrap_status', {
+            if self.memory:
+                self.memory.session.add_chunk('bootstrap_status', json.dumps({
                     'status': 'completed',
-                    'components_initialized': ['memory_manager', 'planner', 'router', 'controller', 'voice_system'],
-                    'completed_at': self.memory_manager.get_core_behavior('bootstrap_completed_at', '')
-                })
+                    'components_initialized': ['memory', 'planner', 'router', 'controller', 'voice_system'],
+                    'completed_at': self.memory.core.get('bootstrap_completed_at', '')
+                }))
             
             bootstrap_result = {
                 'success': True,
                 'status': 'bootstrapped',
                 'components': {
-                    'memory_manager': self.memory_manager is not None,
+                    'memory': self.memory is not None,
                     'planner': self.planner is not None,
                     'router': self.router is not None,
                     'controller': self.controller is not None,
@@ -326,7 +278,7 @@ class Bootstrap:
                     'voice_system': self.voice_system is not None
                 },
                 'config_sections': list(self.config.keys()),
-                'memory_stats': self.memory_manager.get_memory_stats() if self.memory_manager else {},
+                'memory_stats': self.memory.get_memory_stats() if self.memory else {},
                 'voice_enabled': self.config.get('voice', {}).get('enabled', False)
             }
             
@@ -350,7 +302,7 @@ class Bootstrap:
             Component instance or None if not found
         """
         components = {
-            'memory_manager': self.memory_manager,
+            'memory': self.memory,
             'planner': self.planner,
             'router': self.router,
             'controller': self.controller,
@@ -370,15 +322,15 @@ class Bootstrap:
         try:
             status = {
                 'bootstrap_completed': all([
-                    self.memory_manager is not None,
+                    self.memory is not None,
                     self.planner is not None,
                     self.router is not None,
                     self.controller is not None
                 ]),
                 'components': {
-                    'memory_manager': {
-                        'initialized': self.memory_manager is not None,
-                        'stats': self.memory_manager.get_memory_stats() if self.memory_manager else {}
+                    'memory': {
+                        'initialized': self.memory is not None,
+                        'stats': self.memory.get_memory_stats() if self.memory else {}
                     },
                     'planner': {
                         'initialized': self.planner is not None
@@ -425,12 +377,12 @@ class Bootstrap:
                 self.voice_system.stop()
             
             # Save memory state
-            if self.memory_manager:
-                self.memory_manager.save_all_memory()
-                self.memory_manager.update_short_term('shutdown_status', {
+            if self.memory:
+                self.memory.save_all_memory()
+                self.memory.session.add_chunk('shutdown_status', json.dumps({
                     'status': 'shutdown',
-                    'shutdown_at': self.memory_manager.get_core_behavior('shutdown_at', '')
-                })
+                    'shutdown_at': self.memory.core.get('shutdown_at', '')
+                }))
             
             # Save controller session state
             if self.controller:

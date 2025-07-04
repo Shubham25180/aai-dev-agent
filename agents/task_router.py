@@ -25,8 +25,8 @@ class TaskRouter:
     def __init__(self, config: Dict[str, Any], memory_manager: MemoryManager):
         self.config = config
         self.memory_manager = memory_manager
-        self.logger = get_action_logger('task_router')
-        self.error_logger = get_error_logger('task_router')
+        self.logger = get_action_logger('task_router', subsystem='core')
+        self.error_logger = get_error_logger('task_router', subsystem='core')
         
         # Task classification patterns
         self.task_patterns = {

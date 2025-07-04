@@ -1,17 +1,23 @@
-import pyttsx3
-import platform
-import subprocess
+import asyncio
+import edge_tts
+import tempfile
 import os
+import sys
+import threading
+import time
+import platform
+import pyttsx3
+import subprocess
 from utils.logger import get_action_logger, get_error_logger
 
 class Responder:
     """
-    Text-to-speech responder using pyttsx3 (offline, cross-platform).
-    Provides methods for speaking text, adjusting rate/voice, and logging.
+    Fallback/offline TTS engine for NEXUS. Uses pyttsx3 (offline, cross-platform) or Windows built-in TTS.
+    Only used if edge-tts is unavailable or fails.
     """
     def __init__(self, rate=180, volume=1.0, voice=None):
-        self.logger = get_action_logger('voice_responder')
-        self.error_logger = get_error_logger('voice_responder')
+        self.logger = get_action_logger('voice_responder', subsystem='voice')
+        self.error_logger = get_error_logger('voice_responder', subsystem='voice')
         self.engine = None
         
         # Try to initialize TTS engine
@@ -138,28 +144,31 @@ class Responder:
             self._set_default_voice()
 
     def speak(self, text):
-        """Speak the given text."""
+        self.logger.debug(f"[Responder] About to speak: {text}")
         try:
             if self.engine:
-                self.logger.info(f"Speaking: {text}")
+                self.logger.info(f"[Responder] Speaking with pyttsx3: {text}")
                 self.engine.say(text)
                 self.engine.runAndWait()
                 return True
             else:
-                # Fallback: Use Windows built-in TTS
+                self.logger.warning("[Responder] No TTS engine available, using fallback.")
                 return self._speak_fallback(text)
-                
         except Exception as e:
-            self.error_logger.error(f"TTS error: {e}")
+            self.error_logger.error(f"[Responder] TTS error: {e}")
             return self._speak_fallback(text)
 
     def _speak_fallback(self, text):
         """Fallback TTS using Windows built-in speech."""
         try:
             if platform.system().lower() == 'windows':
-                # Use PowerShell to speak
-                clean_text = text.replace('"', '\\"').replace("'", "\\'")
-                command = f'powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'{clean_text}\')"'
+                # Clean and escape the text properly for PowerShell
+                clean_text = text.replace('"', '""').replace("'", "''")
+                # Remove any problematic characters
+                clean_text = ''.join(char for char in clean_text if ord(char) < 128)
+                
+                # Use a simpler PowerShell command
+                command = f'powershell -Command "Add-Type -AssemblyName System.Speech; $speak = New-Object System.Speech.Synthesis.SpeechSynthesizer; $speak.Speak(\'{clean_text}\')"'
                 
                 result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=10)
                 if result.returncode == 0:
@@ -167,12 +176,34 @@ class Responder:
                     return True
                 else:
                     self.logger.warning(f"Fallback TTS failed: {result.stderr}")
-                    return False
+                    # Try even simpler approach
+                    return self._speak_simple_fallback(text)
             else:
                 return False
                 
         except Exception as e:
             self.error_logger.error(f"Fallback TTS error: {e}")
+            return self._speak_simple_fallback(text)
+
+    def _speak_simple_fallback(self, text):
+        """Ultra-simple fallback TTS."""
+        try:
+            if platform.system().lower() == 'windows':
+                # Use a very simple approach - just say "Response ready"
+                command = 'powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'Response ready\')"'
+                
+                result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    self.logger.info("Simple fallback TTS worked")
+                    return True
+                else:
+                    self.logger.warning("All TTS methods failed")
+                    return False
+            else:
+                return False
+                
+        except Exception as e:
+            self.error_logger.error(f"Simple fallback TTS error: {e}")
             return False
 
     def get_available_voices(self):
@@ -192,16 +223,123 @@ class Responder:
         """Get TTS engine status."""
         try:
             if not self.engine:
-                return {'status': 'not_available'}
+                # Check if fallback methods work
+                if platform.system().lower() == 'windows':
+                    return {
+                        'status': 'fallback_available',
+                        'method': 'windows_powershell',
+                        'note': 'Using Windows built-in TTS'
+                    }
+                else:
+                    return {'status': 'not_available'}
                 
             return {
                 'status': 'available',
                 'rate': self.engine.getProperty('rate'),
                 'volume': self.engine.getProperty('volume'),
-                'voice': self.engine.getProperty('voice'),
-                'available_voices': len(self.get_available_voices())
+                'voice': self.engine.getProperty('voice')
             }
             
         except Exception as e:
             self.error_logger.error(f"Failed to get TTS status: {e}")
-            return {'status': 'error', 'error': str(e)} 
+            return {'status': 'error', 'error': str(e)}
+
+    def speak_with_emotion(self, text, emotion="neutral"):
+        """
+        Speak text with TTS, matching the given emotional tone if supported.
+        Args:
+            text (str): Text to speak
+            emotion (str): Emotional tone (e.g., 'happy', 'sad', 'angry')
+        """
+        # TODO: Implement emotion-matched TTS (requires TTS engine with emotion control)
+        self.speak(text)  # Fallback to normal TTS
+
+    def backchannel_response(self):
+        """
+        Speak a natural backchannel phrase (e.g., 'mmhmm', 'Got it!').
+        """
+        # TODO: Implement with a list of natural backchannel phrases
+        self.speak("Got it!")
+
+class TTSResponder:
+    """
+    Default TTS engine for NEXUS. Uses edge-tts for modern, expressive, cloud-like voice output.
+    Falls back to Responder (pyttsx3) for offline/local mode only.
+    """
+    def __init__(self, voice="en-US-AvaNeural"):
+        self.voice = voice or "en-US-AvaNeural"
+        self._loop = None
+        self._thread = None
+        import logging
+        self.logger = logging.getLogger("voice.responder")
+        self.logger.info(f"[TTSResponder] Initialized with voice: {self.voice}")
+        self._start_event_loop()
+        # Check for wmplayer on Windows
+        if platform.system() == "Windows":
+            from shutil import which
+            if not which("wmplayer"):
+                print("[WARNING] Windows Media Player (wmplayer) not found in PATH. edge-tts playback may fail.")
+                self.logger.warning("Windows Media Player (wmplayer) not found in PATH. edge-tts playback may fail.")
+
+    def _start_event_loop(self):
+        if self._loop is None or not self._loop.is_running():
+            self._loop = asyncio.new_event_loop()
+            self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+            self._thread.start()
+            time.sleep(0.1)  # Give the loop time to start
+
+    async def _speak_async(self, text):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            temp_path = f.name
+        try:
+            self.logger.info(f"[TTSResponder] edge-tts request: voice={self.voice}, text={text}")
+            print(f"[DEBUG] TTSResponder: edge-tts request: voice={self.voice}, text={text}")
+            communicate = edge_tts.Communicate(text, self.voice)
+            await communicate.save(temp_path)
+            # Play the mp3 (cross-platform)
+            if platform.system() == "Windows":
+                print(f"[DEBUG] TTSResponder: Playing with wmplayer: {temp_path}")
+                os.system(f'start /min wmplayer "{temp_path}"')
+            elif platform.system() == "Darwin":
+                print(f"[DEBUG] TTSResponder: Playing with afplay: {temp_path}")
+                os.system(f'afplay "{temp_path}"')
+            else:
+                print(f"[DEBUG] TTSResponder: Playing with mpg123: {temp_path}")
+                os.system(f'mpg123 "{temp_path}"')
+            # Wait for playback to finish (simple, not perfect)
+            time.sleep(2)
+        except Exception as e:
+            self.logger.error(f"[TTSResponder] edge-tts error: {e} (voice={self.voice}, text={text})")
+            print(f"[ERROR] TTSResponder: edge-tts error: {e} (voice={self.voice}, text={text})")
+            raise  # Force error, do not silently fall back
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def speak(self, text):
+        print(f"[DEBUG] TTSResponder.speak called with: {text}")
+        self.logger.info(f"[TTSResponder] Speaking (edge-tts, {self.voice}): {text}")
+        import logging
+        logging.getLogger("voice.responder").debug(f"[TTSResponder] About to speak: {text}")
+        if not self._loop or not self._loop.is_running():
+            self._start_event_loop()
+        if self._loop is None:
+            raise RuntimeError("Event loop is not initialized.")
+        try:
+            fut = asyncio.run_coroutine_threadsafe(self._speak_async(text), self._loop)
+            fut.result()
+            print(f"[DEBUG] TTSResponder.speak finished successfully.")
+        except Exception as e:
+            self.logger.error(f"[TTSResponder] speak() error: {e} (voice={self.voice}, text={text})")
+            print(f"[ERROR] TTSResponder.speak() error: {e} (voice={self.voice}, text={text})")
+            raise  # Do not silently fall back
+
+# Usage:
+# tts = TTSResponder(voice="en-US-AvaNeural")
+# tts.speak("Hello, this is Nexus!")
+
+if __name__ == "__main__":
+    print("--- edge-tts Voice Debug ---")
+    import subprocess
+    subprocess.run([sys.executable, "-m", "edge_tts", "--list-voices"])
+    print("Default voice: en-US-AvaNeural") 

@@ -22,8 +22,8 @@ class CodeEditor:
         """
         self.app_state = app_state
         self.config = app_state.get('config', {})
-        self.logger = get_action_logger('code_editor')
-        self.error_logger = get_error_logger('code_editor')
+        self.logger = get_action_logger('code_editor', subsystem='core')
+        self.error_logger = get_error_logger('code_editor', subsystem='core')
         self.file_ops = FileOps(app_state)
         
         # Supported file extensions
@@ -454,4 +454,26 @@ if __name__ == "__main__":
                 'error': error_msg,
                 'file_path': file_path,
                 'executed_at': datetime.utcnow().isoformat() + 'Z'
-            } 
+            }
+
+    def execute_code(self, code, language="python"):
+        """
+        Execute code in a sandboxed environment.
+        Args:
+            code (str): Code to execute
+            language (str): Programming language (default: python)
+        Returns: str (output or error)
+        """
+        # TODO: Implement using exec(), subprocess, or Docker
+        pass
+
+    def debug_code(self, code, language="python"):
+        """
+        Debug code and return suggestions or fixes.
+        Args:
+            code (str): Code to debug
+            language (str): Programming language (default: python)
+        Returns: str (debug output or suggestions)
+        """
+        # TODO: Implement using LLM or static analysis
+        pass 

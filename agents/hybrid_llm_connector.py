@@ -1,20 +1,162 @@
 #!/usr/bin/env python3
 """
-Hybrid LLM Connector - Best of Both Worlds
-Routes requests intelligently between Ollama (coding) and Hugging Face (speed testing)
+Hybrid LLM Connector - Simplified Version
+Routes requests intelligently between different Ollama models
 """
 
 import asyncio
 import time
+import requests
 from typing import Dict, Any, Optional
 from utils.logger import get_action_logger, get_error_logger
 
-try:
-    from agents.llm_connector import OptimizedLLMConnector
-    from agents.huggingface_connector import HuggingFaceConnector
-    BOTH_AVAILABLE = True
-except ImportError:
-    BOTH_AVAILABLE = False
+class OptimizedLLMConnector:
+    """
+    Optimized LLM connector for Ollama models.
+    """
+    
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config or {}
+        self.logger = get_action_logger('optimized_llm')
+        self.error_logger = get_error_logger('optimized_llm')
+        
+        # Ollama configuration
+        self.ollama_url = self.config.get('llm', {}).get('ollama_url', 'http://localhost:11434')
+        self.model_name = self.config.get('llm', {}).get('model_name', 'llama3.2:3b')
+        self.timeout = self.config.get('llm', {}).get('timeout', 120)
+        
+        self.logger.info(f"OptimizedLLMConnector initialized with ollama")
+
+    async def start(self) -> bool:
+        """Start the connector."""
+        try:
+            self.logger.info("Starting OptimizedLLMConnector...")
+            
+            # Check if Ollama is available
+            response = requests.get(f"{self.ollama_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                models = response.json().get('models', [])
+                model_names = [model['name'] for model in models]
+                
+                if self.model_name in model_names:
+                    self.logger.info(f"Ollama model {self.model_name} is available")
+                    return True
+                else:
+                    self.logger.warning(f"Model {self.model_name} not found in Ollama")
+                    return False
+            else:
+                self.logger.error("Ollama not responding")
+                return False
+                
+        except Exception as e:
+            self.error_logger.error(f"Failed to start Ollama connector: {e}")
+            return False
+
+    async def stop(self) -> bool:
+        """Stop the connector."""
+        return True
+
+    async def send_prompt(self, prompt: str, temperature: Optional[float] = None, 
+                         max_tokens: Optional[int] = None, **kwargs) -> Dict[str, Any]:
+        """
+        Send prompt to Ollama.
+        
+        Args:
+            prompt: The prompt to send
+            temperature: Generation temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional parameters
+            
+        Returns:
+            dict: LLM response
+        """
+        try:
+            start_time = time.time()
+            
+            # Prepare request payload
+            payload = {
+                "model": self.model_name,
+                "prompt": prompt,
+                "stream": False
+            }
+            
+            if temperature is not None:
+                payload["temperature"] = temperature
+            if max_tokens is not None:
+                payload["max_tokens"] = max_tokens
+            
+            # Send request to Ollama
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json=payload,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                content = result.get('response', '')
+                
+                self.logger.info("Prompt processed successfully")
+                
+                return {
+                    'success': True,
+                    'content': content,
+                    'response_time': time.time() - start_time,
+                    'model_used': self.model_name
+                }
+            else:
+                self.error_logger.error(f"Ollama request failed: {response.status_code}")
+                return {
+                    'success': False,
+                    'error': f"Ollama request failed: {response.status_code}",
+                    'content': ''
+                }
+                
+        except Exception as e:
+            self.error_logger.error(f"Error in Ollama prompt processing: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'content': ''
+            }
+
+class HuggingFaceConnector:
+    """
+    Placeholder HuggingFace connector for compatibility.
+    """
+    
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config or {}
+        self.logger = get_action_logger('huggingface_connector')
+        self.error_logger = get_error_logger('huggingface_connector')
+        
+        self.logger.info(f"HuggingFaceConnector initialized with device: cpu")
+
+    async def start(self) -> bool:
+        """Start the connector."""
+        try:
+            self.logger.info("Starting HuggingFaceConnector...")
+            # Placeholder - HuggingFace integration removed
+            return False
+        except Exception as e:
+            self.error_logger.error(f"Failed to start HuggingFace connector: {e}")
+            return False
+
+    async def stop(self) -> bool:
+        """Stop the connector."""
+        return True
+
+    async def send_prompt(self, prompt: str, model_type: str = 'fast', 
+                         temperature: Optional[float] = None, 
+                         max_tokens: Optional[int] = None, **kwargs) -> Dict[str, Any]:
+        """
+        Placeholder send prompt method.
+        """
+        return {
+            'success': False,
+            'error': 'HuggingFace connector not available',
+            'content': ''
+        }
 
 class HybridLLMConnector:
     """
@@ -37,9 +179,6 @@ class HybridLLMConnector:
         self.config = config or {}
         self.logger = get_action_logger('hybrid_llm')
         self.error_logger = get_error_logger('hybrid_llm')
-        
-        if not BOTH_AVAILABLE:
-            raise ImportError("Both Ollama and Hugging Face connectors must be available")
         
         # Initialize both connectors
         self.ollama_connector = OptimizedLLMConnector(config)
@@ -188,192 +327,111 @@ class HybridLLMConnector:
     def _determine_backend(self, prompt: str, task_type: Optional[str], 
                           force_backend: Optional[str]) -> str:
         """
-        Intelligently determine which backend to use.
-        
-        Returns:
-            str: 'ollama' or 'huggingface'
+        Force all LLM requests to use Ollama, ignoring keywords and config.
         """
-        # Force specific backend if requested
-        if force_backend:
-            return force_backend
-        
-        # Check for task type hints
-        if task_type:
-            if task_type in ['coding', 'code_generation', 'debug', 'refactor']:
-                return 'ollama'
-            elif task_type in ['simple_qa', 'voice_command', 'quick_response']:
-                return 'huggingface'
-        
-        # Analyze prompt content
-        prompt_lower = prompt.lower()
-        
-        # Force Ollama for coding tasks
-        coding_keywords = self.routing_config.get('coding_keywords', [])
-        if any(keyword in prompt_lower for keyword in coding_keywords):
-            return 'ollama'
-        
-        # Force Ollama for complex tasks
-        force_ollama_keywords = self.routing_config.get('force_ollama', [])
-        if any(keyword in prompt_lower for keyword in force_ollama_keywords):
-            return 'ollama'
-        
-        # Use Hugging Face for simple tasks
-        simple_keywords = self.routing_config.get('simple_keywords', [])
-        if any(keyword in prompt_lower for keyword in simple_keywords):
-            return 'huggingface'
-        
-        # Default to Ollama for unknown tasks
-        return self.routing_config.get('default_backend', 'ollama')
+        return 'ollama'
 
     def _get_routing_reason(self, prompt: str, task_type: Optional[str], 
                            force_backend: Optional[str]) -> str:
-        """Get human-readable reason for routing decision."""
+        """Get the reason for routing decision."""
         if force_backend:
-            return f"Force backend: {force_backend}"
-        
-        if task_type:
-            return f"Task type: {task_type}"
-        
-        prompt_lower = prompt.lower()
-        
-        # Check for specific keywords
-        coding_keywords = self.routing_config.get('coding_keywords', [])
-        if any(keyword in prompt_lower for keyword in coding_keywords):
-            return "Coding task detected"
-        
-        simple_keywords = self.routing_config.get('simple_keywords', [])
-        if any(keyword in prompt_lower for keyword in simple_keywords):
-            return "Simple task detected"
-        
-        force_ollama_keywords = self.routing_config.get('force_ollama', [])
-        if any(keyword in prompt_lower for keyword in force_ollama_keywords):
-            return "Complex task detected"
-        
-        return "Default routing"
+            return f"forced_{force_backend}"
+        elif task_type:
+            return f"task_type_{task_type}"
+        else:
+            return "keyword_analysis"
 
     async def run_speed_comparison(self, test_prompts: list = None) -> Dict[str, Any]:
         """
-        Run speed comparison between Ollama and Hugging Face backends.
+        Run speed comparison between backends.
         
         Args:
-            test_prompts: List of prompts to test
+            test_prompts: List of test prompts
             
         Returns:
-            dict: Comparison results
+            dict: Speed comparison results
         """
-        try:
-            if test_prompts is None:
-                test_prompts = [
-                    "Hello, how are you?",
-                    "What is the weather like?",
-                    "Write a simple Python function to calculate factorial",
-                    "Explain machine learning briefly",
-                    "Debug this code: print('Hello World'"
-                ]
-            
-            self.logger.info("Starting speed comparison test...")
-            
-            results = {
-                'timestamp': time.time(),
-                'test_prompts': test_prompts,
-                'ollama_results': [],
-                'huggingface_results': [],
-                'comparison': {}
-            }
-            
+        if not test_prompts:
+            test_prompts = [
+                "Hello, how are you?",
+                "Write a simple function to calculate factorial",
+                "Explain what is machine learning",
+                "Create a Python class for a user"
+            ]
+        
+        results = {
+            'ollama_times': [],
+            'huggingface_times': [],
+            'prompts': test_prompts
+        }
+        
+        for prompt in test_prompts:
             # Test Ollama
-            print("🧠 Testing Ollama backend...")
-            for i, prompt in enumerate(test_prompts):
-                start_time = time.time()
-                response = await self.ollama_connector.send_prompt(
-                    prompt, temperature=0.7, max_tokens=100
-                )
-                response_time = time.time() - start_time
-                
-                results['ollama_results'].append({
-                    'prompt': prompt,
-                    'response_time': response_time,
-                    'success': response.get('success', False),
-                    'content_length': len(response.get('content', '')),
-                    'model': response.get('model', 'unknown')
-                })
-                
-                print(f"  Prompt {i+1}: {response_time:.3f}s")
+            start_time = time.time()
+            ollama_response = await self.ollama_connector.send_prompt(prompt)
+            ollama_time = time.time() - start_time
+            results['ollama_times'].append(ollama_time)
             
-            # Test Hugging Face
-            print("⚡ Testing Hugging Face backend...")
-            for i, prompt in enumerate(test_prompts):
-                start_time = time.time()
-                response = await self.hf_connector.send_prompt(
-                    prompt, model_type='fast', temperature=0.7, max_tokens=100
-                )
-                response_time = time.time() - start_time
-                
-                results['huggingface_results'].append({
-                    'prompt': prompt,
-                    'response_time': response_time,
-                    'success': response.get('success', False),
-                    'content_length': len(response.get('content', '')),
-                    'model': response.get('model_name', 'unknown')
-                })
-                
-                print(f"  Prompt {i+1}: {response_time:.3f}s")
-            
-            # Calculate comparison metrics
-            ollama_times = [r['response_time'] for r in results['ollama_results']]
-            hf_times = [r['response_time'] for r in results['huggingface_results']]
-            
-            if ollama_times and hf_times:
-                results['comparison'] = {
-                    'ollama_avg_time': sum(ollama_times) / len(ollama_times),
-                    'hf_avg_time': sum(hf_times) / len(hf_times),
-                    'speed_ratio': sum(ollama_times) / sum(hf_times) if sum(hf_times) > 0 else 0,
-                    'faster_backend': 'huggingface' if sum(hf_times) < sum(ollama_times) else 'ollama'
-                }
-            
-            return results
-            
-        except Exception as e:
-            self.error_logger.error(f"Speed comparison failed: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            # Test HuggingFace (if available)
+            start_time = time.time()
+            hf_response = await self.hf_connector.send_prompt(prompt)
+            hf_time = time.time() - start_time
+            results['huggingface_times'].append(hf_time)
+        
+        # Calculate averages
+        if results['ollama_times']:
+            results['avg_ollama_time'] = sum(results['ollama_times']) / len(results['ollama_times'])
+        if results['huggingface_times']:
+            results['avg_huggingface_time'] = sum(results['huggingface_times']) / len(results['huggingface_times'])
+        
+        return results
 
     def get_performance_metrics(self) -> Dict[str, Any]:
-        """Get comprehensive performance metrics for both backends."""
-        try:
-            ollama_metrics = self.ollama_connector.get_performance_metrics()
-            hf_metrics = self.hf_connector.get_performance_metrics()
-            
-            return {
-                'hybrid_metrics': {
-                    'ollama_requests': self.ollama_requests,
-                    'hf_requests': self.hf_requests,
-                    'total_requests': self.ollama_requests + self.hf_requests,
-                    'ollama_ratio': self.ollama_requests / (self.ollama_requests + self.hf_requests) if (self.ollama_requests + self.hf_requests) > 0 else 0,
-                    'hf_ratio': self.hf_requests / (self.ollama_requests + self.hf_requests) if (self.ollama_requests + self.hf_requests) > 0 else 0
-                },
-                'ollama_metrics': ollama_metrics,
-                'huggingface_metrics': hf_metrics,
-                'routing_config': self.routing_config
-            }
-        except Exception as e:
-            self.error_logger.error(f"Error getting performance metrics: {e}")
-            return {}
-
-    def get_status(self) -> Dict[str, Any]:
-        """Get system status for both backends."""
+        """Get performance metrics."""
         return {
-            'active': True,
-            'model_type': 'hybrid',
-            'ollama_status': self.ollama_connector.get_status(),
-            'huggingface_status': self.hf_connector.get_status(),
-            'routing_stats': {
-                'ollama_requests': self.ollama_requests,
-                'hf_requests': self.hf_requests,
-                'total_requests': self.ollama_requests + self.hf_requests
-            }
+            'ollama_requests': self.ollama_requests,
+            'huggingface_requests': self.hf_requests,
+            'total_requests': self.ollama_requests + self.hf_requests,
+            'routing_decisions': self.routing_decisions
         }
 
-# Backward compatibility - can be used as drop-in replacement
+    def get_status(self) -> Dict[str, Any]:
+        """Get connector status."""
+        return {
+            'ollama_available': True,  # Simplified
+            'huggingface_available': False,  # Simplified
+            'default_backend': self.routing_config.get('default_backend', 'ollama')
+        }
+
+    def generate(self, prompt: str, temperature: float = 0.2, max_tokens: int = 256) -> str:
+        """
+        Synchronous generate method for compatibility with LLMPlanner.
+        Calls the Ollama backend and returns the generated text as a string.
+        """
+        try:
+            # Always run the async send_prompt using asyncio
+            coro = self.ollama_connector.send_prompt(prompt, temperature=temperature, max_tokens=max_tokens)
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            if loop.is_running():
+                # If already running (e.g. in Jupyter), use asyncio.run_coroutine_threadsafe
+                import concurrent.futures
+                future = asyncio.run_coroutine_threadsafe(coro, loop)
+                result = future.result()
+            else:
+                result = loop.run_until_complete(coro)
+            if isinstance(result, dict) and result.get('success'):
+                return result.get('content', '')
+            else:
+                self.error_logger.error(f"LLM generate failed: {result}")
+                return ""
+        except Exception as e:
+            self.error_logger.error(f"Exception in generate: {e}")
+            return ""
+
 class LLMConnector(HybridLLMConnector):
-    """Backward compatibility wrapper."""
+    """Alias for backward compatibility."""
     pass 

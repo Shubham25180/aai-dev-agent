@@ -17,6 +17,14 @@ from agents.hybrid_llm_connector import HybridLLMConnector
 from utils.logger import get_action_logger, get_error_logger
 import asyncio
 import requests
+import queue
+from voice.listener import MicListener
+from voice.wake_word import WakeWordDetector
+from voice.transcriber import RealTimeTranscriber
+from voice.responder import TTSResponder
+from context_pipeline import analyze_emotion  # Reuse emotion logic
+from voice.always_on_listener import AlwaysOnListener
+import subprocess
 
 def signal_handler(signum, frame):
     """
@@ -26,7 +34,7 @@ def signal_handler(signum, frame):
         signum: Signal number
         frame: Current stack frame
     """
-    logger = get_action_logger('main')
+    logger = get_action_logger('main', subsystem='core')
     logger.info(f"Received signal {signum}, shutting down gracefully")
     
     # Get bootstrap instance and shutdown
@@ -72,7 +80,7 @@ async def process_voice_with_llm(text: str, language: str, llm_connector) -> Dic
         }
         
     except Exception as e:
-        logger = get_action_logger('voice_llm')
+        logger = get_action_logger('voice_llm', subsystem='voice')
         logger.error(f"Error processing voice with LLM: {e}")
         return {'success': False, 'error': str(e)}
 
@@ -121,7 +129,7 @@ def voice_command_handler(command_result: Dict[str, Any], controller) -> Dict[st
     Returns:
         dict: Execution result
     """
-    logger = get_action_logger('voice_handler')
+    logger = get_action_logger('voice_handler', subsystem='voice')
     
     try:
         command = command_result.get('command')
@@ -295,7 +303,7 @@ async def real_time_voice_monitor(voice_system, controller, llm_connector):
         controller: Main application controller
         llm_connector: Hybrid LLM connector
     """
-    logger = get_action_logger('voice_monitor')
+    logger = get_action_logger('voice_monitor', subsystem='voice')
     
     logger.info("Starting real-time voice system monitor")
     
@@ -335,6 +343,90 @@ async def real_time_voice_monitor(voice_system, controller, llm_connector):
     except Exception as e:
         logger.error(f"Voice monitor error: {e}")
 
+WAKE_WORD = "nexus"
+AUDIO_BUFFER_SECONDS = 3  # How much audio to buffer after wake word
+
+class NexusVoiceOrchestrator:
+    def __init__(self):
+        self.listener = MicListener()
+        self.wake_detector = WakeWordDetector(wake_word=WAKE_WORD)
+        self.transcriber = RealTimeTranscriber()
+        self.tts = TTSResponder()
+        self.audio_queue = queue.Queue()
+        self.running = True
+
+    def mic_thread(self):
+        self.listener.start()
+        for chunk in self.listener.get_audio_chunk():
+            self.audio_queue.put(chunk)
+            if not self.running:
+                break
+
+    def main_loop(self):
+        print("[Nexus] Always-on voice system started. Listening to everything...")
+        while self.running:
+            chunk = self.audio_queue.get()
+            self.transcriber.add_chunk(chunk)
+            transcript = self.transcriber.transcribe_buffer()
+            if transcript.strip():
+                print(f"[Nexus] Transcript: {transcript}")
+                if "nexus" in transcript.lower():
+                    print("[Nexus] (COMMAND DETECTED!) You addressed me directly.")
+            if not self.running:
+                break
+
+    def run(self):
+        mic_thread = threading.Thread(target=self.mic_thread, daemon=True)
+        mic_thread.start()
+        try:
+            self.main_loop()
+        except KeyboardInterrupt:
+            print("[Nexus] Shutting down...")
+            self.running = False
+            self.listener.stop()
+
+# --- Text mode fallback (existing logic) ---
+def text_mode():
+    print("[Nexus] Text mode activated. Type your commands below.")
+    # ... existing text input loop ...
+    while True:
+        user_input = input("💬 Enter your command, question, or task:\n> ")
+        if user_input.strip().lower() in ["exit", "quit"]:
+            print("[Nexus] Exiting text mode.")
+            break
+        # TODO: Integrate with ConversationalBrain and TTS
+        print(f"[Nexus] (Stub) You typed: {user_input}")
+
+# --- Ollama auto-start logic ---
+def ensure_ollama_running():
+    ollama_url = "http://localhost:11434"
+    try:
+        # Try to ping Ollama API
+        r = requests.get(f"{ollama_url}/api/tags", timeout=2)
+        if r.status_code == 200:
+            print("[NEXUS] Ollama is already running.")
+            return
+    except Exception:
+        print("[NEXUS] Ollama not running. Starting Ollama server...")
+        try:
+            subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            print(f"[NEXUS] Failed to start Ollama: {e}")
+            sys.exit(1)
+        # Wait for Ollama to be ready
+        for i in range(20):
+            try:
+                r = requests.get(f"{ollama_url}/api/tags", timeout=2)
+                if r.status_code == 200:
+                    print("[NEXUS] Ollama started successfully.")
+                    return
+            except Exception:
+                time.sleep(1)
+        print("[NEXUS] Warning: Ollama did not start in time. LLM requests may fail.")
+
+# Ensure Ollama is running before anything else
+ensure_ollama_running()
+
 def main():
     """
     Main application entry point with real-time voice integration.
@@ -344,8 +436,8 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     # Initialize logging
-    logger = get_action_logger('main')
-    error_logger = get_error_logger('main')
+    logger = get_action_logger('main', subsystem='core')
+    error_logger = get_error_logger('main', subsystem='core')
     
     logger.info("Starting AI Dev Agent with real-time voice support")
     
@@ -410,11 +502,11 @@ def main():
                 print("   • Performance Monitor Thread")
                 
                 print("\n🎯 Voice Commands Available:")
-                print("   • 'Nova, open main.py'")
-                print("   • 'Nova, create new function'")
-                print("   • 'Nova, run tests'")
-                print("   • 'Nova, save all files'")
-                print("   • 'Nova, undo last action'")
+                print("   • 'Nexus, open main.py'")
+                print("   • 'Nexus, create new function'")
+                print("   • 'Nexus, run tests'")
+                print("   • 'Nexus, save all files'")
+                print("   • 'Nexus, undo last action'")
                 
                 # Start voice monitor in background
                 voice_monitor_thread = threading.Thread(
@@ -429,79 +521,36 @@ def main():
         
         # Initialize conversational brain
         conversational_brain = ConversationalBrain(bootstrap_result.get('config', {}))
+        # Inject edge-tts responder from voice_system
+        if hasattr(voice_system, 'responder') and voice_system.responder:
+            conversational_brain.set_tts_responder(voice_system.responder)
         if conversational_brain.start():
             print("🧠 Conversational Brain activated!")
         
         # Show TTS status
         if conversational_brain.tts_enabled:
-            print("🔊 Text-to-Speech: Enabled - NOVA will speak responses!")
+            print("🔊 Text-to-Speech: Enabled - Nexus will speak responses!")
         else:
-            print("🔇 Text-to-Speech: Disabled - NOVA will only display text")
+            print("🔇 Text-to-Speech: Disabled - Nexus will only display text")
         
         # Main interaction loop
         logger.info("System ready for task processing")
-        print("\n🚀 NOVA is ready! You can:")
+        print("\n🚀 Nexus is ready! You can:")
         print("   📝 Type commands below")
         print("   🎤 Speak voice commands (if voice enabled)")
-        print("   🔊 Hear NOVA speak responses (if TTS enabled)")
+        print("   🔊 Hear Nexus speak responses (if TTS enabled)")
         print("   💬 Ask questions or request help")
         print("   ❌ Type 'exit' or 'quit' to stop")
         print("-" * 60)
         
-        # Keep the application running with text input
-        try:
-            while True:
-                # Ask for text input
-                print("\n💬 Enter your command, question, or task:")
-                user_input = input("> ").strip()
-                
-                # Check for exit commands
-                if user_input.lower() in ['exit', 'quit', 'stop', 'bye']:
-                    print("👋 Goodbye! Shutting down NOVA...")
-                    break
-                
-                # Skip empty input
-                if not user_input:
-                    continue
-                
-                # Process text input through conversational brain
-                print(f"\n🤖 Processing: '{user_input}'")
-                response = conversational_brain.process_input(user_input, 'text')
-                
-                # Display response
-                if response.get('text'):
-                    print(f"\n💡 NOVA Response:")
-                    print(f"{response['text']}")
-                    
-                    # Speak the response using TTS
-                    try:
-                        if conversational_brain.tts_enabled:
-                            print("🔊 Speaking response...")
-                            conversational_brain.speak_response(response['text'])
-                    except Exception as e:
-                        logger.warning(f"TTS failed: {e}")
-                    
-                    # Show which model was used
-                    if response.get('model_used'):
-                        print(f"\n🧠 Model used: {response['model_used']}")
-                    
-                    # Show confidence if available
-                    if response.get('confidence'):
-                        print(f"📊 Confidence: {response['confidence']:.1%}")
-                    
-                    # Show web search info if used
-                    if response.get('web_search_used'):
-                        print("🌐 Web search used for real-time information")
-                
-                # Handle errors
-                if response.get('error'):
-                    print(f"\n❌ Error: {response['error']}")
-                
-                print("-" * 60)
-                
-        except KeyboardInterrupt:
-            logger.info("Received keyboard interrupt")
-            print("\n👋 Shutting down NOVA...")
+        # Ask user for mode
+        mode = input("Select mode: [1] Voice (always-on)  [2] Text (type commands)\nEnter 1 for Voice, 2 for Text [default: 1]: ").strip()
+        if mode == "2":
+            text_mode()
+            return
+        # --- Always-On Voice Mode ---
+        always_on = AlwaysOnListener(conversational_brain=conversational_brain)
+        always_on.run()
         
         return 0
         
@@ -521,5 +570,4 @@ def main():
         logger.info("AI Dev Agent shutdown complete")
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code) 
+    main() 

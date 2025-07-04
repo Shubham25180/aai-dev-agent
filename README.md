@@ -1,338 +1,169 @@
-# 🤖 AI Dev Agent - NOVA System
+## 🧠 The Brain: Human-Readable Structure & Explanation
 
-A memory-aware, undo-capable, proactive AI developer assistant with voice support and hybrid LLM integration.
+### 1. How Many Pages/Files Form the "Brain"?
 
-## 🚀 Quick Start
+The "brain" of the agent is primarily composed of these files in the `agents/` directory:
 
-### 🧪 **Test on Hugging Face Spaces**
+- `conversational_brain.py` (main LLM/agent logic, 705 lines)
+- `planner.py` (task/plan logic, 598 lines)
+- `task_router.py` (task routing, 582 lines)
+- `hybrid_llm_connector.py` (LLM/model connector, 465 lines)
 
-**Live Demo**: [AI Dev Agent Space](https://huggingface.co/spaces/Shubham25180/ai)
+**Total:**
 
-Click the link above to test the AI Dev Agent directly in your browser!
+- 4 main files (pages) form the core "brain" logic.
+- Each file is 400–700 lines, so each is a substantial "page" of logic.
 
-### 🏠 **Local Installation**
+### 2. Making the Code Human-Readable
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/ai-dev-agent.git
-cd ai-dev-agent
+Every line or logical block in the "brain" code should be explained in plain English, right before the code. This makes the system accessible and maintainable for all developers.
 
-# Install dependencies
-pip install -r requirements.txt
-
-# For Hugging Face integration
-pip install -r requirements_huggingface.txt
-
-# Start the AI Dev Agent
-python main.py
-```
-
-## 🔄 **Updating the Repository**
-
-### **1. Make Local Changes**
-
-```bash
-# Edit your files locally
-# Test your changes
-python main.py
-```
-
-### **2. Update Hugging Face Repository**
-
-```bash
-# Upload changes to Hugging Face
-C:\Users\shubh\AppData\Roaming\Python\Python313\Scripts\huggingface-cli.exe upload Shubham25180/ai .
-
-# Or use the full path on your system
-huggingface-cli upload Shubham25180/ai .
-```
-
-### **3. Update GitHub (if you have it)**
-
-```bash
-git add .
-git commit -m "Update: [describe your changes]"
-git push origin main
-```
-
-## 🧪 **Testing Options**
-
-### **Option 1: Hugging Face Spaces (Recommended)**
-
-- **No installation required**
-- **Instant testing**
-- **Web interface**
-- **Automatic updates**
-
-Visit: https://huggingface.co/spaces/Shubham25180/ai
-
-### **Option 2: Local Testing**
-
-```bash
-# Run the main application
-python main.py
-
-# Run speed tests
-python test_hybrid_speed.py
-python test_huggingface_speed.py
-
-# Run voice tests
-python test_voice.py
-```
-
-### **Option 3: Streamlit Demo**
-
-```bash
-# Run the web demo locally
-streamlit run app.py
-```
-
-## 📊 **Features**
-
-### Core Capabilities
-
-- **🧠 Conversational Brain**: Intelligent task processing with dual-model strategy
-- **🎤 Voice Integration**: Multi-language voice commands (English & Hindi)
-- **💾 Memory Management**: Persistent context and conversation history
-- **↩️ Undo System**: Safe operation with rollback capabilities
-- **⚡ Speed Optimizations**: Hybrid LLM routing for optimal performance
-
-### LLM Integration
-
-- **🔄 Hybrid Backend**: Ollama for coding, Hugging Face for speed testing
-- **🧠 Multiple Models**: Support for various model sizes and configurations
-- **⚡ Intelligent Routing**: Automatic backend selection based on task type
-- **📊 Performance Monitoring**: Detailed speed and memory metrics
-
-### Voice System
-
-- **🌍 Multi-language**: English and Hindi voice recognition
-- **🎯 Command Processing**: Natural language to action mapping
-- **⚡ Real-time**: Continuous listening with low latency
-- **🔊 Text-to-Speech**: Voice responses and feedback
-
-## 🏗️ Architecture
-
-```
-AI Dev Agent/
-├── agents/                 # Core AI components
-│   ├── conversational_brain.py
-│   ├── hybrid_llm_connector.py
-│   ├── huggingface_connector.py
-│   └── llm_connector.py
-├── app/                   # Application layer
-│   ├── bootstrap.py
-│   ├── controller.py
-│   └── router.py
-├── voice/                 # Voice processing
-│   ├── voice_system.py
-│   ├── enhanced_voice_system.py
-│   └── commands.py
-├── executor/              # Task execution
-│   ├── code_editor.py
-│   ├── file_ops.py
-│   └── shell_ops.py
-├── memory/                # Memory management
-│   └── memory_manager.py
-├── undo/                  # Undo system
-│   └── undo_manager.py
-├── app.py                 # Streamlit demo for Spaces
-└── config/                # Configuration files
-    ├── settings.yaml
-    ├── settings_hybrid.yaml
-    └── settings_huggingface.yaml
-```
-
-## 🧠 Hybrid LLM System
-
-### Backend Selection
-
-| Task Type            | Backend      | Use Case                                |
-| -------------------- | ------------ | --------------------------------------- |
-| **Coding**           | Ollama       | Code generation, debugging, refactoring |
-| **Simple Q&A**       | Hugging Face | Quick responses, voice commands         |
-| **Complex Analysis** | Ollama       | Detailed reasoning, problem solving     |
-| **Speed Testing**    | Hugging Face | Performance comparison, optimization    |
-
-### Model Configurations
-
-```yaml
-# Ollama (Coding Tasks)
-ollama:
-  model_name: "deepseek-coder-v2:lite"
-  temperature: 0.3
-  max_tokens: 2048
-
-# Hugging Face (Speed Tasks)
-huggingface:
-  models:
-    fast:
-      model_name: "microsoft/DialoGPT-small"
-      max_tokens: 512
-    balanced:
-      model_name: "microsoft/DialoGPT-medium"
-      max_tokens: 1024
-```
-
-## 🎤 Voice Commands
-
-### English Commands
-
-- "Open main.py"
-- "Create new function"
-- "Run tests"
-- "Save all files"
-- "Undo last action"
-
-### Hindi Commands
-
-- "file kholo"
-- "function banane ke liye"
-- "test run karo"
-- "sab files save karo"
-- "last action undo karo"
-
-## 📊 Performance
-
-### Speed Test Results
-
-- **Ollama (Coding)**: ~0.5-1.0s response time
-- **Hugging Face (Simple)**: ~0.2-0.3s response time
-- **Voice Processing**: ~0.1-0.2s latency
-- **Memory Usage**: 200MB-1.5GB depending on model
-
-### Optimization Features
-
-- **Prompt Caching**: 90%+ cache hit rate for repeated requests
-- **Model Quantization**: 8-bit models for faster inference
-- **Lazy Loading**: Models loaded on demand
-- **Health Monitoring**: Automatic fallback and recovery
-
-## 🔧 Configuration
-
-### Hybrid Configuration
-
-```yaml
-llm:
-  model_type: "hybrid"
-  routing:
-    default_backend: "ollama"
-    coding_keywords: ["code", "function", "debug", "refactor"]
-    simple_keywords: ["hello", "what is", "explain briefly"]
-```
-
-### Voice Configuration
-
-```yaml
-voice:
-  enabled: true
-  model_size: "base.en"
-  supported_languages: ["en", "hi"]
-  min_confidence: 0.6
-```
-
-## 🧪 Testing
-
-### Speed Tests
-
-```bash
-# Test hybrid system
-python test_hybrid_speed.py
-
-# Test Hugging Face only
-python test_huggingface_speed.py
-
-# Test voice system
-python test_voice.py
-```
-
-### Performance Monitoring
+**Example (applied to `nexus_gui.py`):**
 
 ```python
-from agents.hybrid_llm_connector import HybridLLMConnector
+# This imports the PyQt6 widgets for building the GUI.
+from PyQt6.QtWidgets import QApplication, QMainWindow
 
-connector = HybridLLMConnector(config)
-metrics = connector.get_performance_metrics()
-print(f"Cache hit rate: {metrics['cache_hit_rate']:.1%}")
-print(f"Average response time: {metrics['avg_response_time']:.3f}s")
+# This class defines the main window of the application.
+class NexusMainWindow(QMainWindow):
+    # ...
 ```
 
-## 🔄 **Update Workflow**
+This style should be used throughout the codebase, especially in the core "brain" files.
 
-### **Daily Development Cycle**
+### 3. Prompts and Model Tuning
 
-1. **Make Changes Locally**
-
-   ```bash
-   # Edit your code
-   # Test locally
-   python main.py
-   ```
-
-2. **Test on Hugging Face**
-
-   ```bash
-   # Upload to test
-   huggingface-cli upload Shubham25180/ai .
-   # Visit: https://huggingface.co/spaces/Shubham25180/ai
-   ```
-
-3. **Commit to Version Control**
-   ```bash
-   git add .
-   git commit -m "Feature: [description]"
-   git push origin main
-   ```
-
-### **Automated Updates (Optional)**
-
-Create a script for easy updates:
-
-```bash
-# update_repo.sh
-#!/bin/bash
-echo "🔄 Updating Hugging Face repository..."
-huggingface-cli upload Shubham25180/ai .
-echo "✅ Update complete!"
-echo "🌐 Visit: https://huggingface.co/spaces/Shubham25180/ai"
-```
-
-## 📈 Roadmap
-
-- [ ] **Advanced Code Analysis**: AST-based code understanding
-- [ ] **Multi-modal Support**: Image and video processing
-- [ ] **Collaborative Features**: Team development support
-- [ ] **Plugin System**: Extensible architecture
-- [ ] **Cloud Integration**: Remote model serving
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test on Hugging Face Spaces
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Ollama**: For local model serving
-- **Hugging Face**: For model hosting and optimization
-- **Whisper**: For voice recognition
-- **OpenAI**: For inspiration and best practices
+- The `prompts/` directory contains prompt files for different models and flows:
+  - `nexus_llm_brain_init.prompt`, `nexus_brain_god_tier.prompt`, `nexus_task_router.prompt`, etc.
+- Each model (Stable Diffusion, DeepSeek-Coder, Open Interpreter, etc.) can have its own prompt file, which you can tune for that model's strengths and quirks.
+- The code in `conversational_brain.py` loads and uses these prompts, and you can add logic to select/tune prompts per model as shown in your flowchart.
 
 ---
 
-**Made with ❤️ by Shubham25180**
+## 🚀 How to Run the App
 
-_Your AI Development Companion_
+### Prerequisites
 
-## 🔗 **Quick Links**
+- Python 3.10+
+- All dependencies in `requirements.txt`
+- (Optional) Ollama, ChromaDB, and other model backends as needed
 
-- **🌐 Live Demo**: [Hugging Face Spaces](https://huggingface.co/spaces/Shubham25180/ai)
-- **📚 Documentation**: [Wiki](https://github.com/your-username/ai-dev-agent/wiki)
-- **🐛 Issues**: [Bug Reports](https://github.com/your-username/ai-dev-agent/issues)
-- **💬 Discussions**: [Community](https://github.com/your-username/ai-dev-agent/discussions)
+### Installation
+
+```bash
+# Clone and setup
+ git clone <repository>
+ cd ai_dev_agent
+ pip install -r requirements.txt
+```
+
+### Running the App
+
+#### 1. Terminal (CLI) Mode
+
+```bash
+python main_simple.py
+```
+
+#### 2. GUI Mode
+
+```bash
+python gui/nexus_gui.py
+```
+
+#### 3. Run Specific Parts
+
+- **Voice System:**
+  ```bash
+  python voice/voice_system.py
+  ```
+- **Test LLM Connection:**
+  ```bash
+  python test_llm_connection.py
+  ```
+- **Web Server (if available):**
+  ```bash
+  python nexus_web.py
+  ```
+
+## Running the NiceGUI Frontend
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Start the NiceGUI app:
+   ```bash
+   python main_nicegui.py
+   ```
+
+The app will launch in your browser at http://localhost:8080 with a modern ChatGPT-style interface and voice controls.
+
+---
+
+## 📁 What Should Be in the README
+
+- **Project Overview:**
+  - What the agent does, its personality, and its modular design.
+- **Architecture:**
+  - Directory structure, core components, and memory system.
+- **Usage:**
+  - How to install, run, and test the app (GUI, terminal, voice, web, etc.).
+- **Prompts & Model Tuning:**
+  - How to edit/tune prompts for different models.
+- **Memory System:**
+  - How core, session, and long-term memory work.
+- **Human-Readable Code:**
+  - Example and encouragement to comment code for clarity.
+- **Troubleshooting:**
+  - Common issues and solutions for LLM, voice, and GUI.
+- **Contributing:**
+  - How to contribute, coding style, and extensibility.
+- **License:**
+  - Project license and usage terms.
+
+---
+
+## 📝 Example: Human-Readable Code Comments
+
+```python
+# Import the typing module for type hints (Dict, Any, etc.)
+from typing import Dict, Any, Optional, List
+
+# Import datetime for timestamps and time-based logic.
+from datetime import datetime
+```
+
+---
+
+## 🤖 Prompts and Model Tuning
+
+- Prompts are stored in the `prompts/` directory.
+- Each model can have a custom prompt file for optimal performance.
+- You can add logic in the agent to select the right prompt for each model/task.
+
+---
+
+## 🆘 Troubleshooting
+
+- **LLM Issues:** Ensure your backend (Ollama, etc.) is running and models are available.
+- **Voice Issues:** Check your OS voice configuration and `voice/` scripts.
+- **GUI Issues:** Ensure PyQt6 is installed and run `gui/nexus_gui.py` directly for debugging.
+
+---
+
+## 🤝 Contributing
+
+- Comment your code for human readability.
+- Follow the modular structure and keep logic in the appropriate "brain" file.
+- Submit issues and PRs for new features, bugfixes, or prompt improvements.
+
+---
+
+## 📄 License
+
+This project is developed as a personal AI development assistant. All code and documentation are part of the nexus AI system.
+
+---
+
+nexus is ready to help with your coding adventures - with a side of sass! 😈🚀

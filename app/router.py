@@ -23,8 +23,8 @@ class Router:
         """
         self.app_state = app_state
         self.config = app_state.get('config', {})
-        self.logger = get_action_logger('router')
-        self.error_logger = get_error_logger('router')
+        self.logger = get_action_logger('router', subsystem='core')
+        self.error_logger = get_error_logger('router', subsystem='core')
         
         # Initialize executors
         self.shell_ops = ShellOps(app_state)

@@ -1,0 +1,12 @@
+=== Backend Conversation ===
+
+
+=== Memory State ===
+Session Memory:
+
+
+Core Memory:
+{}
+
+Long-Term Memory (stats):
+N/A

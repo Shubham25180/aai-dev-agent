@@ -1,0 +1,1 @@
+while llm is findina a solution -- it generates a few snippets --of what it is doing and what it should do---llm should supply a summary of that to brain and brain should read it out loud and stor in memory--this way user is still interested

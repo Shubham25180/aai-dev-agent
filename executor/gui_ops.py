@@ -20,8 +20,8 @@ class GuiOps:
         """
         self.app_state = app_state
         self.config = app_state.get('config', {})
-        self.logger = get_action_logger('gui_ops')
-        self.error_logger = get_error_logger('gui_ops')
+        self.logger = get_action_logger('gui_ops', subsystem='gui')
+        self.error_logger = get_error_logger('gui_ops', subsystem='gui')
         
         # GUI automation settings
         self.gui_enabled = self.config.get('features', {}).get('gui_fallback', True)
@@ -458,4 +458,31 @@ class GuiOps:
         Returns:
             Click operation result
         """
-        return self.click_element(f"position({x},{y})") 
+        return self.click_element(f"position({x},{y})")
+
+    def type_text(self, text: str) -> Dict[str, Any]:
+        """
+        Simulate typing text into the active window.
+        Args:
+            text (str): Text to type
+        """
+        # TODO: Implement using pyautogui or keyboard
+        pass
+
+    def scroll(self, amount: int) -> Dict[str, Any]:
+        """
+        Simulate mouse scroll.
+        Args:
+            amount (int): Scroll amount (positive/negative)
+        """
+        # TODO: Implement using pyautogui
+        pass
+
+    def focus_window(self, window_title: str) -> Dict[str, Any]:
+        """
+        Focus a window by title.
+        Args:
+            window_title (str): Title of the window to focus
+        """
+        # TODO: Implement using pygetwindow or similar
+        pass 

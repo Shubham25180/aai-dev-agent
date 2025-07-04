@@ -15,8 +15,8 @@ class VoiceCommandHandler:
             controller: Controller instance to execute commands
         """
         self.controller = controller
-        self.logger = get_action_logger('voice_handler')
-        self.error_logger = get_error_logger('voice_handler')
+        self.logger = get_action_logger('voice_handler', subsystem='voice')
+        self.error_logger = get_error_logger('voice_handler', subsystem='voice')
         
         # Command mapping
         self.command_handlers = {

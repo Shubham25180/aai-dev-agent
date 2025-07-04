@@ -20,8 +20,8 @@ class ShellOps:
         """
         self.app_state = app_state
         self.config = app_state.get('config', {})
-        self.logger = get_action_logger('shell_ops')
-        self.error_logger = get_error_logger('shell_ops')
+        self.logger = get_action_logger('shell_ops', subsystem='core')
+        self.error_logger = get_error_logger('shell_ops', subsystem='core')
         
         # Dangerous commands that require confirmation
         self.dangerous_commands = [
