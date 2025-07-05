@@ -1,4 +1,4 @@
-# 🧠 Agent Workflow & Architecture (Status: June 2025)
+# 🧠 Agent Workflow & Architecture (2025, Modernized, ≤190 Lines)
 
 ## 🚦 Status Overview
 
@@ -6,9 +6,8 @@
 |--------------------------------------|--------------|---------------------------------------------------|
 | Voice transcription (VAD + Whisper)  | ✅ DONE       | Stable, integrated                                |
 | Wake word detection                  | ✅ DONE       | Integrated                                        |
-| GUI recording/logger                 | ✅ DONE       | Integrated with modular memory layer              |
-| Memory logging (SQLite + JSON)       | ✅ DONE       | Modular memory (Core, Session, Long-Term) in use  |
-| Scheduled summarization trigger      | ✅ DONE       | Session/periodic summarization                    |
+| NiceGUI (ChatGPT-style)              | ✅ DONE       | All controls live, no permission prompts           |
+| Memory logging (Core/Session/Long)   | ✅ DONE       | Modular, multi-layer, tightly integrated           |
 | Session state handling               | ✅ DONE       | Start/stop/resume supported                       |
 | Intent detection (text)              | ⏳ IN PROGRESS| Rule-based/regex, CPU-only                        |
 | LLM prompt routing + timeout logic   | ✅ DONE       | Timeout/session logic in place                    |
@@ -17,9 +16,8 @@
 | Prompt auto-tuning                   | ⏳ PLANNED    | Use feedback loop to refine prompts               |
 | Track prompt-response mismatch       | ⏳ PLANNED    | Build scoring/logging system                      |
 | Emotion/sentiment analysis           | ⏳ IN PROGRESS| TextBlob/VADER, CPU-only                          |
-| Speaker detection                    | ⏳ PLANNED    | For multi-user, diarization                       |
-| Mood-based/ambient responses         | ⏳ PLANNED    | Rule engine for friendly/ambient behaviors        |
-| Continual learning/adaptation        | 🔲 FUTURE     | Long-term, research-level                         |
+| Reflex mode (auto-retry)             | ✅ DONE       | Agent retries/fixes automatically                 |
+| Undo/Recovery                        | ✅ DONE       | Snapshots before/after all file mods              |
 
 ---
 
@@ -27,7 +25,7 @@
 
 - **Ear:** Whisper, VAD (voice to text, silence detection) — **DONE**
 - **Speech Emotion:** TextBlob/VADER (CPU-only) — **IN PROGRESS**
-- **Vision/GUI:** PyAutoGUI, screen logger — **DONE/BASIC**
+- **Vision/GUI:** NiceGUI, screen logger — **DONE**
 - **Memory:** SQLite, JSON, ChromaDB — **DONE** (Core, Session, Long-Term fully integrated)
 - **Mood:** Mood-state tracker (rule-based, to be expanded) — **PLANNED**
 - **Feedback:** Log user/LLM interaction, prompt success/failure — **PLANNED**
@@ -111,3 +109,40 @@
 ---
 
 **All features and enhancements are designed to run efficiently on CPU-only systems. No GPU-required models are used for intent, mood, or core agent logic.**
+
+
+1. Prepare Your Backend (FastAPI) for API-First Use
+Keep: All your Python code for LLM, memory, voice, agent, etc.
+Expose: REST and/or WebSocket endpoints for:
+Chat (send/receive messages)
+Toggle/switch state (GET/POST)
+Sliders, dropdowns, and other controls
+Status/memory/agent/LLM info
+File upload/download (if needed)
+Tip: Use FastAPI’s built-in OpenAPI docs to test endpoints.
+2. Scaffold a New React Frontend
+Create a new directory (e.g., nexus-frontend).
+Initialize with Vite (recommended for speed):
+Apply to workflow.txt
+Install dependencies:
+Apply to workflow.txt
+3. Configure Tailwind and shadcn/ui
+Set up Tailwind in your tailwind.config.js and index.css (follow Tailwind docs).
+Add shadcn/ui components as needed (see shadcn/ui docs).
+4. Build Core UI Components
+Chat window (messages, bubbles, streaming, avatars)
+Input bar (with send button, mic, etc.)
+Toggles, sliders, dropdowns (use shadcn/ui or Radix primitives)
+Status/memory/agent/LLM cards (grid layout)
+Notifications/snackbars (for feedback)
+Dark mode support (Tailwind makes this easy)
+5. Connect to FastAPI Backend
+REST: Use fetch or axios for standard API calls.
+WebSocket: Use native WebSocket or a library (e.g., socket.io-client or reconnecting-websocket) for real-time chat/streaming.
+Tip: Store the backend URL in an .env file for easy switching.
+6. Implement State Management
+Use React context or a state library (e.g., Zustand, Redux, or just useState/useReducer) for:
+Chat history
+Toggle/switch state
+Status info
+User settings
