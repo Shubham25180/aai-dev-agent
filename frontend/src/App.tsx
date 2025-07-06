@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { sendChatMessage, getStatus, getToggles, updateToggles, WebSocketClient, StatusResponse, TogglesResponse } from './nexusApi';
+import { sendChatMessage, getStatus, getToggles, updateToggles, WebSocketClient } from './nexusApi';
+import type { StatusResponse, TogglesResponse } from './nexusApi';
 
 interface ChatMessage {
   id: string;
@@ -7,6 +8,37 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   status?: 'sending' | 'sent' | 'error';
+}
+
+// Placeholder status card components
+const StatusCard = ({ title, value, status, toggle }: { title: string; value: string; status?: string; toggle?: React.ReactNode }) => (
+  <div className="bg-gray-800 rounded-lg p-4 flex flex-col items-start border border-gray-700 min-w-[140px]">
+    <div className="flex items-center w-full justify-between">
+      <div className="text-xs text-gray-400 mb-1">{title}</div>
+      {toggle && <div className="ml-2">{toggle}</div>}
+    </div>
+    <div className="text-lg font-semibold text-white">{value}</div>
+    {status && <div className="text-xs mt-1 text-gray-400">{status}</div>}
+  </div>
+);
+
+function ToggleSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer select-none">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={onChange}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-blue-600' : 'bg-gray-400'}`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-1'}`}
+        />
+      </button>
+      <span className="text-sm text-gray-200 min-w-[120px]">{label}</span>
+    </label>
+  );
 }
 
 function App() {
@@ -18,6 +50,10 @@ function App() {
   const [wsConnected, setWsConnected] = useState(false);
   const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [wit, setWit] = useState(50);
+  const [sarcasm, setSarcasm] = useState(50);
+  const [verbosity, setVerbosity] = useState(50);
+  const [sttEnabled, setSttEnabled] = useState(true);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -103,14 +139,14 @@ function App() {
         // Fallback to REST API
         const response = await sendChatMessage(inputMessage);
         setMessages(prev => [
-          ...prev.map(msg => msg.id === userMessage.id ? { ...msg, status: 'sent' } : msg),
+          ...prev.map(msg => msg.id === userMessage.id ? { ...msg, status: 'sent' as 'sent' } : msg),
           {
             id: (Date.now() + 1).toString(),
             type: 'assistant',
             content: response.response,
             timestamp: new Date(),
             status: 'sent'
-          }
+          } satisfies ChatMessage
         ]);
       }
     } catch (error) {
@@ -152,236 +188,173 @@ function App() {
     }
   };
 
+  // Add a handler for the Speak button
+  const handleSpeak = () => {
+    // Placeholder: This should call the backend to speak the last prompt using edge-tts or fallback
+    // For now, just log to console
+    if (messages.length > 0) {
+      const lastPrompt = messages[messages.length - 1].content;
+      console.log('Speak:', lastPrompt);
+      // TODO: Call backend TTS endpoint with lastPrompt
+    } else {
+      console.log('No prompt to speak.');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-black text-white flex flex-col">
       {/* Header */}
-      <header className="border-b border-gray-700 bg-gray-800/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-nexus-400 to-nexus-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">N</span>
-              </div>
-              <h1 className="text-xl font-sora font-semibold">Nexus AI Dev Agent</h1>
-            </div>
-            
-            {/* Connection Status */}
-            <div className="flex items-center space-x-4">
-              <div className={`flex items-center space-x-2 ${wsConnected ? 'text-green-400' : 'text-red-400'}`}>
-                <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                <span className="text-sm font-medium">
-                  {wsConnected ? 'Connected' : 'Disconnected'}
-                </span>
-              </div>
-            </div>
-          </div>
+      <header className="w-full border-b border-gray-800 bg-gray-900/80 px-8 py-4 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          {/* Removed the main heading for a test/dev layout */}
         </div>
+        {/* Removed the model info from header */}
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Status Panel */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* System Status */}
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-              <h2 className="text-lg font-sora font-semibold mb-4">System Status</h2>
-              <div className="space-y-3">
-                {status && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">Memory</span>
-                      <span className="text-sm">
-                        {status.memory.short_term} items
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">Voice</span>
-                      <span className={`text-sm ${getStatusColor(status.voice.status)}`}>
-                        {status.voice.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">Agent</span>
-                      <span className={`text-sm ${getStatusColor(status.agent.status)}`}>
-                        {status.agent.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">LLM</span>
-                      <span className={`text-sm ${getStatusColor(status.llm.status)}`}>
-                        {status.llm.status}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
+      {/* Main Content: 3-column grid */}
+      <main className="flex-1 grid grid-cols-8 gap-6 p-8">
+        {/* 1st Column: Status Cards (2/8) */}
+        <div className="col-span-2 flex flex-col h-full justify-between">
+          <div>
+            <div className="grid grid-cols-2 gap-4">
+              <StatusCard
+                title="Voice"
+                value="Active"
+                status="Listening"
+                toggle={<ToggleSwitch label="" checked={!!toggles?.voice} onChange={() => handleToggleChange('voice')} />}
+              />
+              <StatusCard
+                title="TTS"
+                value="edge-tts"
+                status="Ready"
+                toggle={<ToggleSwitch label="" checked={!!toggles?.tts} onChange={() => handleToggleChange('tts')} />}
+              />
+              <StatusCard
+                title="STT"
+                value="Whisper"
+                status="Ready"
+                toggle={<ToggleSwitch label="" checked={sttEnabled} onChange={() => setSttEnabled(v => !v)} />}
+              />
+              <StatusCard title="LLM" value="Ollama" status="Connected" />
             </div>
-
-            {/* Controls */}
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-              <h2 className="text-lg font-sora font-semibold mb-4">Controls</h2>
-              <div className="space-y-3">
-                {toggles && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-300">Voice</span>
-                      <button
-                        onClick={() => handleToggleChange('voice')}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          toggles.voice ? 'bg-nexus-500' : 'bg-gray-600'
-                        }`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          toggles.voice ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-300">TTS</span>
-                      <button
-                        onClick={() => handleToggleChange('tts')}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          toggles.tts ? 'bg-nexus-500' : 'bg-gray-600'
-                        }`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          toggles.tts ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-300">Auto Scroll</span>
-                      <button
-                        onClick={() => handleToggleChange('auto_scroll')}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          toggles.auto_scroll ? 'bg-nexus-500' : 'bg-gray-600'
-                        }`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          toggles.auto_scroll ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-300">Intent Detection</span>
-                      <button
-                        onClick={() => handleToggleChange('intent')}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          toggles.intent ? 'bg-nexus-500' : 'bg-gray-600'
-                        }`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          toggles.intent ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-300">Emotion Detection</span>
-                      <button
-                        onClick={() => handleToggleChange('emotion')}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          toggles.emotion ? 'bg-nexus-500' : 'bg-gray-600'
-                        }`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          toggles.emotion ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <StatusCard title="Memory" value="Short: 1 | Long: N/A | Core: 2" status="Editable" />
+              <StatusCard title="Agent" value="Processing" status="Idle" />
+              <StatusCard title="GUI" value="Recorder: On" status="" />
+              <div />
             </div>
           </div>
 
-          {/* Chat Interface */}
-          <div className="lg:col-span-3">
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700 h-[600px] flex flex-col">
-              {/* Chat Header */}
-              <div className="p-4 border-b border-gray-700">
-                <h2 className="text-lg font-sora font-semibold">Chat with Nexus</h2>
-                <p className="text-sm text-gray-400">Ask me to help with development tasks, file operations, or system automation.</p>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.length === 0 && (
-                  <div className="text-center text-gray-400 py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-700 rounded-full flex items-center justify-center">
-                      <span className="text-2xl">🧠</span>
-                    </div>
-                    <p className="text-lg font-medium mb-2">Welcome to Nexus</p>
-                    <p className="text-sm">I'm your AI development assistant. How can I help you today?</p>
-                  </div>
-                )}
-                
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        message.type === 'user'
-                          ? 'bg-nexus-600 text-white'
-                          : message.type === 'assistant'
-                          ? 'bg-gray-700 text-white'
-                          : 'bg-yellow-600/20 text-yellow-200'
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {message.timestamp.toLocaleTimeString()}
-                        {message.status === 'sending' && ' • Sending...'}
-                        {message.status === 'error' && ' • Error'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-700 rounded-lg px-4 py-2">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                        </div>
-                        <span className="text-sm text-gray-400">Nexus is thinking...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input */}
-              <div className="p-4 border-t border-gray-700">
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Type your message or command..."
-                    className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-nexus-500 focus:border-transparent"
-                    disabled={isLoading}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={isLoading || !inputMessage.trim()}
-                    className="bg-nexus-600 hover:bg-nexus-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
+          {/* Sliders for Wit, Sarcasm, and Verbosity at the very bottom left */}
+          <div className="flex flex-col gap-2 bg-gray-900 border border-gray-700 rounded-lg p-4 mt-4">
+            <div className="flex items-center gap-4">
+              <label htmlFor="wit-slider" className="text-sm text-gray-300 w-24">Wit:</label>
+              <input
+                id="wit-slider"
+                type="range"
+                min={0}
+                max={100}
+                value={wit}
+                onChange={e => setWit(Number(e.target.value))}
+                className="flex-1 accent-green-600 h-2 rounded-lg appearance-none bg-gray-700"
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <label htmlFor="sarcasm-slider" className="text-sm text-gray-300 w-24">Sarcasm:</label>
+              <input
+                id="sarcasm-slider"
+                type="range"
+                min={0}
+                max={100}
+                value={sarcasm}
+                onChange={e => setSarcasm(Number(e.target.value))}
+                className="flex-1 accent-blue-400 h-2 rounded-lg appearance-none bg-gray-700"
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <label htmlFor="verbosity-slider" className="text-sm text-gray-300 w-24">Verbosity:</label>
+              <input
+                id="verbosity-slider"
+                type="range"
+                min={0}
+                max={100}
+                value={verbosity}
+                onChange={e => setVerbosity(Number(e.target.value))}
+                className="flex-1 accent-green-600 h-2 rounded-lg appearance-none bg-gray-700"
+              />
             </div>
           </div>
         </div>
-      </div>
+
+        {/* 2nd Column: Chat Area (5/8) */}
+        <div className="col-span-5 flex flex-col bg-gray-900 rounded-lg border border-gray-800 p-6 min-h-[500px]">
+          <div className="flex-1 flex flex-col justify-end">
+            {/* Chat history placeholder */}
+            <div className="flex-1 text-gray-400 flex items-center justify-center">
+              <span>Chat area (GPT-style) coming soon...</span>
+            </div>
+            {/* Chat input placeholder */}
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="text"
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-nexus-500 focus:border-transparent"
+                placeholder="Type your message or command..."
+                disabled
+              />
+              <button className="bg-nexus-600 hover:bg-nexus-700 text-white px-6 py-2 rounded-lg font-medium transition-colors" disabled>
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 3rd Column: Additional Buttons (1/8) */}
+        <div className="col-span-1 flex flex-col gap-4 items-stretch">
+          <button
+            className="bg-blue-700 border border-blue-800 rounded-lg px-4 py-2 text-white font-medium hover:bg-blue-800 transition-colors"
+            onClick={handleSpeak}
+          >
+            Speak
+          </button>
+          <button className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-medium hover:bg-gray-700 transition-colors">Show Last Prompt</button>
+          <button className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-medium hover:bg-gray-700 transition-colors">Debug/Transparency</button>
+          <button className="bg-gray-800 border border-blue-700 text-blue-400 rounded-lg px-4 py-2 font-medium hover:bg-blue-900 transition-colors">Pinned Facts: none</button>
+
+          {/* Toggle Switches */}
+          <div className="mt-4 bg-gray-900 border-2 border-blue-500 rounded-lg p-4 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <ToggleSwitch
+                label="Auto-scroll Chat"
+                checked={!!toggles?.auto_scroll}
+                onChange={() => handleToggleChange('auto_scroll')}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <ToggleSwitch
+                label="Intent Detection"
+                checked={!!toggles?.intent}
+                onChange={() => handleToggleChange('intent')}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <ToggleSwitch
+                label="Emotion Detection"
+                checked={!!toggles?.emotion}
+                onChange={() => handleToggleChange('emotion')}
+              />
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="w-full border-t border-gray-800 bg-gray-900/80 px-8 py-2 text-xs text-gray-400 flex items-center justify-between">
+        <span>
+          Voice: Active | TTS: edge-tts | STT: Whisper | LLM: Ollama | Memory: 1 short, 2 core
+          <span className="ml-6">Model: <span className="text-white">Ollama</span><span className="ml-1 text-green-400">Connected</span></span>
+        </span>
+        <span>© 2025 Nexus AI Dev Agent</span>
+      </footer>
     </div>
   );
 }

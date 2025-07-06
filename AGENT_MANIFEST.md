@@ -6,7 +6,7 @@
 - **LLM Routing:** All requests routed to Ollama (default: deepseek-coder-v2:lite). HuggingFace for compatibility.
 - **Prompt System:** Unified, using `nexus_brain_init.prompt`.
 - **Logging:** Modular, chunked by subsystem. Debug logging for TTS, LLM, and voice.
-- **GUI:** Modern, dark, ChatGPT-style interface with real-time toggles, live LLM response, and always-on voice/memory integration.
+- **GUI:** Modern, dark, ChatGPT-style React+Tailwind interface with real-time toggle switches (not checkboxes), live LLM response, and always-on voice/memory integration, and modern sliders for persona/response tuning.
 - **Voice/TTS:** edge-tts default, pyttsx3/Windows fallback. Voice selection via config. Whisper (medium/base.en) for STT. RealTimeVoiceSystem fully integrated.
 - **Known Issues:** edge-tts fails if unavailable voice is selected. Some GUI/voice toggles need more testing. Intent/emotion classifier integration in progress.
 
@@ -16,6 +16,9 @@
 - GUI and agent tightly integrated with memory.
 - Always-on voice and memory logging in all workflows.
 - TTS debug logging and robust fallback.
+- GUI now uses modern toggle switches (not checkboxes) for all boolean controls, with improved alignment and accessibility.
+- All toggles, sliders, and controls are visually aligned and accessible, using Tailwind and custom React components.
+- Frontend is fully decoupled from backend, using REST/WebSocket for all state and updates.
 
 ## Next Steps
 
@@ -70,7 +73,7 @@
 
 ## Voice Recognition & Synthesis
 
-- Real-time, always-on voice with wake word (“nexus”), streaming STT (Whisper/Faster-Whisper).
+- Real-time, always-on voice with wake word ("nexus"), streaming STT (Whisper/Faster-Whisper).
 - TTS: edge-tts (default), pyttsx3 fallback. Voice selection via config.
 - All voice/TTS errors logged, robust fallback.
 - Multi-language: English, Hindi, Indian English, auto-detect.

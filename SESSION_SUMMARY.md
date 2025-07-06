@@ -2,7 +2,7 @@
 
 ## Major Changes
 
-- **GUI:** Migrated from PyQt/PySide to NiceGUI. The interface is now modern, ChatGPT-style, and fully interactive. All controls (buttons, toggles, sliders, chat, mic) are live and provide instant feedback. No more dead widgets.
+- **GUI:** Migrated from PyQt/PySide to NiceGUI, then to React+Tailwind. The interface is now modern, ChatGPT-style, and fully interactive. All controls (buttons, toggle switches, sliders, chat, mic) are live, visually aligned, and provide instant feedback. All boolean controls use modern toggle switches (not checkboxes) for improved accessibility and UX. No more dead widgets.
 - **Autonomy:** Agent now operates in "no-permission-needed" mode. All actions (file edits, UI changes, retries, validation) are performed automatically, with no user confirmation required. If something fails, the agent fixes and retries until successful.
 - **Voice:** Real-time, always-on, multi-language (English, Hindi, Indian English, auto-detect). Robust fallback for TTS/STT. Wake word and streaming STT fully integrated.
 - **Memory:** Modular, multi-layer (core, session, long-term), tightly integrated with agent and GUI. All significant actions, preferences, and patterns are logged and recalled automatically.
@@ -223,7 +223,7 @@ This summary reflects the current state of the project after the NiceGUI migrati
 ## [2025 Update] Session Summary
 
 - Memory and prompt transparency: All memory types and prompts are visible and editable in the GUI.
-- Persona/response controls: User can tune wit, sarcasm, and verbosity live.
+- Persona/response controls: User can tune wit, sarcasm, and verbosity live. All toggles are now modern switches, not checkboxes, and are visually aligned for a professional look.
 - Memory management: Facts can be moved, annotated, deleted, and summarized; user controls what is injected into the LLM.
 - Advanced UI/UX: Dark theme, tooltips, backend log, and prompt editing for full user control.
 - New workflow: User can see and tune every step of the agent's reasoning and memory pipeline.

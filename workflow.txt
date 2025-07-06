@@ -6,7 +6,7 @@
 |--------------------------------------|--------------|---------------------------------------------------|
 | Voice transcription (VAD + Whisper)  | ✅ DONE       | Stable, integrated                                |
 | Wake word detection                  | ✅ DONE       | Integrated                                        |
-| GUI recording/logger                 | ✅ DONE       | Integrated with modular memory layer              |
+| GUI recording/logger                 | ✅ DONE       | Integrated with modular memory layer; all boolean controls now use modern toggle switches (not checkboxes) for improved UX and accessibility. UI is React+Tailwind, visually aligned, and decoupled from backend. |
 | Memory logging (SQLite + JSON)       | ✅ DONE       | Modular memory (Core, Session, Long-Term) in use  |
 | Scheduled summarization trigger      | ✅ DONE       | Session/periodic summarization                    |
 | Session state handling               | ✅ DONE       | Start/stop/resume supported                       |
