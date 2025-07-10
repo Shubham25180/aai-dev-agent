@@ -1,3 +1,6 @@
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Shubham25180/aai-dev-agent?utm_source=oss&utm_medium=github&utm_campaign=Shubham25180%2Faai-dev-agent&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
+
 ## 🧠 The Brain: Human-Readable Structure & Explanation
 
 ### 1. How Many Pages/Files Form the "Brain"?
