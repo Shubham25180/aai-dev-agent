@@ -7,6 +7,7 @@ Routes requests intelligently between different Ollama models
 import asyncio
 import time
 import requests
+import json
 from typing import Dict, Any, Optional
 from utils.logger import get_action_logger, get_error_logger
 
@@ -77,7 +78,7 @@ class OptimizedLLMConnector:
             payload = {
                 "model": self.model_name,
                 "prompt": prompt,
-                "stream": False
+                "stream": True  # Enable streaming for all requests
             }
             
             if temperature is not None:
@@ -85,15 +86,19 @@ class OptimizedLLMConnector:
             if max_tokens is not None:
                 payload["max_tokens"] = max_tokens
             
+            self.logger.info(f"[DEBUG] Sending payload to Ollama: {payload}")
             # Send request to Ollama
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
                 json=payload,
                 timeout=self.timeout
             )
+            elapsed = time.time() - start_time
+            self.logger.info(f"[DEBUG] Ollama response status: {response.status_code}, elapsed: {elapsed:.2f}s")
             
             if response.status_code == 200:
                 result = response.json()
+                self.logger.info(f"[DEBUG] Ollama response: {result}")
                 content = result.get('response', '')
                 
                 self.logger.info("Prompt processed successfully")
@@ -105,6 +110,7 @@ class OptimizedLLMConnector:
                     'model_used': self.model_name
                 }
             else:
+                self.logger.error(f"[DEBUG] Ollama returned status {response.status_code}")
                 self.error_logger.error(f"Ollama request failed: {response.status_code}")
                 return {
                     'success': False,
@@ -113,12 +119,47 @@ class OptimizedLLMConnector:
                 }
                 
         except Exception as e:
+            self.error_logger.error(f"[DEBUG] Ollama request error: {e}")
             self.error_logger.error(f"Error in Ollama prompt processing: {e}")
             return {
                 'success': False,
                 'error': str(e),
                 'content': ''
             }
+
+    def stream_prompt(self, prompt: str, temperature: float = 0.8, max_tokens: int = 150, **kwargs):
+        """
+        Stream prompt to Ollama and yield tokens/chunks as they arrive.
+        """
+        payload = {
+            "model": self.model_name,
+            "prompt": prompt,
+            "stream": True,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        self.logger.info(f"[DEBUG] Streaming payload to Ollama: {payload}")
+        try:
+            start_time = time.time()
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json=payload,
+                stream=True,
+                timeout=self.timeout
+            )
+            elapsed = time.time() - start_time
+            self.logger.info(f"[DEBUG] Ollama streaming response status: {response.status_code}, elapsed: {elapsed:.2f}s")
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        data = json.loads(line.decode('utf-8'))
+                        chunk = data.get('response', '')
+                        if chunk:
+                            yield chunk
+                    except Exception as e:
+                        self.error_logger.error(f"Failed to parse Ollama stream chunk: {e}")
+        except Exception as e:
+            self.error_logger.error(f"Ollama streaming error: {e}")
 
 class HuggingFaceConnector:
     """
@@ -431,6 +472,12 @@ class HybridLLMConnector:
         except Exception as e:
             self.error_logger.error(f"Exception in generate: {e}")
             return ""
+
+    def stream_prompt(self, prompt: str, temperature: float = 0.8, max_tokens: int = 150, **kwargs):
+        """
+        Always stream from Ollama for now.
+        """
+        return self.ollama_connector.stream_prompt(prompt, temperature, max_tokens, **kwargs)
 
 class LLMConnector(HybridLLMConnector):
     """Alias for backward compatibility."""

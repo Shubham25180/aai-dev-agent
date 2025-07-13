@@ -1,43 +1,37 @@
-# NEXUS AI Dev Agent Manifest (200-Line Summary)
+# NEXUS AI Dev Agent Manifest (Updated)
 
 ## System Overview
 
-- **Architecture:** Modular, LLM-based agent with always-on voice, advanced GUI, and multi-tier memory (Core JSON, Session SQLite, Long-Term ChromaDB).
-- **LLM Routing:** All requests routed to Ollama (default: deepseek-coder-v2:lite). HuggingFace for compatibility.
+- **Architecture:** Modular, LLM-based agent with always-on voice, advanced Python-native GUI (PyQt6 or NiceGUI), and multi-tier memory (Core JSON, Session SQLite, Long-Term ChromaDB).
+- **LLM Routing:** All requests routed to Ollama (default: deepseek-coder-v2:lite) or local LLMs. HuggingFace for compatibility.
 - **Prompt System:** Unified, using `nexus_brain_init.prompt`.
 - **Logging:** Modular, chunked by subsystem. Debug logging for TTS, LLM, and voice.
-- **GUI:** Modern, dark, ChatGPT-style React+Tailwind interface with real-time toggle switches (not checkboxes), live LLM response, and always-on voice/memory integration, and modern sliders for persona/response tuning.
+- **GUI:** Modern, dark, ChatGPT-style PyQt6 or NiceGUI interface with real-time toggle switches, live LLM response, and always-on voice/memory integration. No frontend/backend split—everything is Python-native and in-process.
 - **Voice/TTS:** edge-tts default, pyttsx3/Windows fallback. Voice selection via config. Whisper (medium/base.en) for STT. RealTimeVoiceSystem fully integrated.
-- **Known Issues:** edge-tts fails if unavailable voice is selected. Some GUI/voice toggles need more testing. Intent/emotion classifier integration in progress.
+- **Known Issues:** Some GUI/voice toggles need more testing. Intent/emotion classifier integration in progress.
 
 ## Recent Changes
 
-- Fully modular `MemoryLayer` (Core, Session, Long-Term).
-- GUI and agent tightly integrated with memory.
+- Migrated back to a Python-native GUI (PyQt6 or NiceGUI) for simplicity and solo developer velocity.
+- GUI and agent tightly integrated with memory and automation modules (gui_hybrid).
 - Always-on voice and memory logging in all workflows.
 - TTS debug logging and robust fallback.
-- GUI now uses modern toggle switches (not checkboxes) for all boolean controls, with improved alignment and accessibility.
-- All toggles, sliders, and controls are visually aligned and accessible, using Tailwind and custom React components.
-- Frontend is fully decoupled from backend, using REST/WebSocket for all state and updates.
+- All toggles, sliders, and controls are visually aligned and accessible, using PyQt6 widgets or NiceGUI components.
+- Removed the React+FastAPI web stack as the main UI.
 
 ## Next Steps
 
-- Debug STT input pipeline.
+- Polish the PyQt6/NiceGUI interface and controls.
 - Finalize GUI/voice toggle integration.
 - Continue modularization and feature roadmap.
 
 ## Project Directory (Key Files)
 
+- gui_hybrid/: action_router.py, vision.py, llm_planner.py, executor.py
+- gui/: nexus_gui.qss (theme), (new) nexus_gui.py or main_nicegui.py
 - agents/: conversational_brain.py, hybrid_llm_connector.py, task_router.py, planner.py
-- app/: controller.py, bootstrap.py, voice_handler.py, router.py
 - config/: settings.yaml, settings_hybrid.yaml, settings_simple.yaml
-- executor/: code_editor.py, gui_ops.py, file_ops.py, shell_ops.py
-- gui/: (NiceGUI-based, main_nicegui.py)
-- logs/
-- main.py, main_simple.py, main_nicegui.py
 - memory/: memory_layer.py, core_behavior.json, core_memory.json, embeddings/
-- model/: vosk/, yolov8n.pt
-- prompts/: code_model.prompt, memory_update.prompt, narrator_mode.prompt, etc.
 - requirements.txt, roadmap.txt, SESSION_SUMMARY.md, undo/, utils/, vision/, voice/
 
 ## Major Features
@@ -124,18 +118,6 @@
 - Record exact command and effect.
 - Allow "undo step X" or "rollback changes from 10 minutes ago" (voice or text).
 - Maintain comprehensive undo history.
-
----
-
-# Session Summary (Updated)
-
-- **GUI:** Switched to NiceGUI, modern ChatGPT-style, all controls interactive, no permission prompts.
-- **Voice:** Real-time, always-on, multi-language, robust fallback.
-- **Memory:** Modular, multi-layer, tightly integrated with agent and GUI.
-- **Logging:** All actions, plans, and voice commands logged.
-- **Reflex Mode:** Auto-retry, learning from failures.
-- **No more permission requests:** Agent acts autonomously, fixes issues, and repeats until successful.
-- **Next Steps:** Wire backend logic (LLM, TTS, memory) to new UI, continue modularization, expand advanced features.
 
 ---
 

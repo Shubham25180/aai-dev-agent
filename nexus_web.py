@@ -1,3 +1,7 @@
+# nexus_web.py - Optional/Experimental Web UI
+#
+# This script is NOT part of the main backend pipeline.
+# For full backend startup, use main.py.
 import streamlit as st
 import time
 from nexus_agent import NexusAgent

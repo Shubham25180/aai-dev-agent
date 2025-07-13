@@ -5,6 +5,11 @@ import sounddevice as sd
 import numpy as np
 from faster_whisper import WhisperModel
 from utils.logger import get_action_logger, get_error_logger
+try:
+    import noisereduce as nr
+    NOISE_REDUCE_AVAILABLE = True
+except ImportError:
+    NOISE_REDUCE_AVAILABLE = False
 
 class Recognizer:
     """
@@ -45,11 +50,21 @@ class Recognizer:
             raise
 
     def _audio_callback(self, indata, frames, time, status):
-        """Audio callback for real-time processing."""
+        """Audio callback for real-time processing with noise reduction then normalization."""
         if status:
             self.error_logger.error(f"Audio status: {status}")
-        # Convert to float32 and normalize
+        # Convert to float32 and scale
         audio_data = indata.copy().astype(np.float32) / 32768.0
+        # Noise reduction (simple, per chunk)
+        if NOISE_REDUCE_AVAILABLE:
+            try:
+                audio_data = nr.reduce_noise(y=audio_data.flatten(), sr=self.sample_rate)
+            except Exception as e:
+                self.logger.warning(f"Noise reduction failed: {e}")
+        # Peak normalization (after noise reduction)
+        peak = np.max(np.abs(audio_data))
+        if peak > 0:
+            audio_data = audio_data / peak
         self.audio_queue.put(audio_data)
 
     def start(self):
@@ -77,8 +92,8 @@ class Recognizer:
         print("[DEBUG] Recognizer: Recognition stopped.")
 
     def _recognize_loop(self):
-        """Main recognition loop for real-time processing."""
-        print("[DEBUG] Recognizer: Entered recognition loop.")
+        """Main recognition loop for real-time processing with VAD buffering (2s silence)."""
+        print("[DEBUG] Recognizer: Entered recognition loop (VAD buffering mode).")
         try:
             with sd.InputStream(
                 samplerate=self.sample_rate,
@@ -89,13 +104,49 @@ class Recognizer:
             ):
                 self.logger.info("Audio stream started")
                 print("[DEBUG] Recognizer: Audio stream started.")
+                buffer = np.array([], dtype=np.float32)
+                silence_threshold = 0.01  # Amplitude below this is considered silence
+                silence_duration_sec = 2.0
+                silence_samples = int(self.sample_rate * silence_duration_sec)
                 while self.running:
                     try:
-                        # Process audio in chunks
                         audio_chunk = self.audio_queue.get(timeout=1.0)
                         print("[DEBUG] Recognizer: Got audio chunk.")
-                        # For real-time, we'd need to implement buffering
-                        # This is a simplified version
+                        buffer = np.concatenate([buffer, audio_chunk.flatten()])
+                        # Check for 2s of silence at the end of the buffer
+                        if buffer.shape[0] >= silence_samples:
+                            tail = buffer[-silence_samples:]
+                            if np.max(np.abs(tail)) < silence_threshold:
+                                # Found 2s of silence, process buffer up to this point
+                                utterance = buffer[:-silence_samples]
+                                if utterance.shape[0] > 0:
+                                    print("[DEBUG] Recognizer: 2s silence detected, processing utterance.")
+                                    # Noise reduction on full utterance
+                                    if NOISE_REDUCE_AVAILABLE:
+                                        try:
+                                            utterance = nr.reduce_noise(y=utterance, sr=self.sample_rate)
+                                        except Exception as e:
+                                            self.logger.warning(f"Noise reduction failed on utterance: {e}")
+                                    # Peak normalization (after noise reduction)
+                                    peak = np.max(np.abs(utterance))
+                                    if peak > 0:
+                                        utterance = utterance / peak
+                                    # Send utterance to Whisper for transcription
+                                    if self.model is not None:
+                                        segments, info = self.model.transcribe(
+                                            utterance,
+                                            beam_size=1,
+                                            language=None,
+                                            task="transcribe",
+                                            vad_filter=False  # Already chunked by VAD
+                                        )
+                                        transcript = " ".join([seg.text for seg in segments])
+                                        print(f"[TRANSCRIPT] {transcript.strip()}")
+                                        self.logger.info(f"[TRANSCRIPT] {transcript.strip()}")
+                                    else:
+                                        self.logger.error("Whisper model is not loaded!")
+                                # Remove processed audio from buffer
+                                buffer = buffer[-silence_samples:]
                     except queue.Empty:
                         continue
         except Exception as e:

@@ -42,49 +42,33 @@ This style should be used throughout the codebase, especially in the core "brain
 
 ## 🚀 How to Run the App
 
-### Prerequisites
-
-- Python 3.10+
-- All dependencies in `requirements.txt`
-- (Optional) Ollama, ChromaDB, and other model backends as needed
-
-### Installation
+### Full Backend (Recommended)
 
 ```bash
-# Clone and setup
- git clone <repository>
- cd ai_dev_agent
- pip install -r requirements.txt
+python main.py
 ```
 
-### Running the App
+- Starts API server, LLM, memory, voice, and agent logic.
+- Use this for all production and development backend startup.
 
-#### 1. Terminal (CLI) Mode
+### Simple/Dev Mode (No LLM, No Voice, No API)
 
 ```bash
 python main_simple.py
 ```
 
-#### 2. GUI Mode
+- Minimal mode for lightweight or offline/dev scenarios.
+- No LLM, no voice, no API server.
+
+### Optional/Experimental Web UI
 
 ```bash
-python gui/nexus_gui.py
+python nexus_web.py
 ```
 
-#### 3. Run Specific Parts
-
-- **Voice System:**
-  ```bash
-  python voice/voice_system.py
-  ```
-- **Test LLM Connection:**
-  ```bash
-  python test_llm_connection.py
-  ```
-- **Web Server (if available):**
-  ```bash
-  python nexus_web.py
-  ```
+- Streamlit-based web UI for chat/automation.
+- Not part of the main backend pipeline.
+- For full backend, use main.py.
 
 ## Running the NiceGUI Frontend
 

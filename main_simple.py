@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-AI Dev Agent - Simple Mode (No LLM Required)
-A memory-aware, undo-capable, proactive AI developer assistant.
-Basic functionality without LLM dependencies.
+main_simple.py - Minimal/Dev Mode Entry Point
+
+This script starts the agent in simple mode (no LLM, no voice, no API server).
+Use only for lightweight, offline, or development scenarios.
+For full backend startup, use main.py.
 """
 
 import sys
@@ -161,5 +163,6 @@ def main():
         logger.info("AI Dev Agent shutdown complete")
 
 if __name__ == "__main__":
+    # === Simple/dev mode only. For full backend, use main.py ===
     exit_code = main()
     sys.exit(exit_code) 

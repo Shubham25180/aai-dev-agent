@@ -5,6 +5,122 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nexus</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Inter:wght@400;700&family=Space+Grotesk:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Glassmorphism and modern UI overrides */
+      .glass {
+        background: rgba(20, 20, 30, 0.6);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 1.5rem;
+        border: 1px solid #4e0e8a;
+      }
+      .glass-button {
+        background: linear-gradient(
+          135deg,
+          rgba(80, 0, 180, 0.25) 0%,
+          rgba(40, 0, 80, 0.5) 100%
+        );
+        color: #d1aaff;
+        border: 1.5px solid #a259ff;
+        border-radius: 1.2rem;
+        box-shadow: 0 2px 16px 0 rgba(162, 89, 255, 0.18), 0 1.5px 0 #4e0e8a;
+        padding: 0.6em 1.5em;
+        font-family: "Sora", "Inter", "Space Grotesk", sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: 0.01em;
+        transition: all 0.18s cubic-bezier(0.4, 2, 0.3, 1);
+        cursor: pointer;
+        outline: none;
+        position: relative;
+        overflow: hidden;
+      }
+      .glass-button:hover,
+      .glass-button:focus {
+        background: linear-gradient(135deg, #a259ff 0%, #4e0e8a 100%);
+        color: #fff;
+        box-shadow: 0 4px 32px 0 #a259ff55, 0 2px 0 #4e0e8a;
+        border-color: #fff;
+        filter: brightness(1.08) saturate(1.2);
+      }
+      .glass-button:active {
+        background: linear-gradient(135deg, #4e0e8a 0%, #a259ff 100%);
+        color: #fff;
+        box-shadow: 0 2px 8px 0 #4e0e8a99;
+        border-color: #a259ff;
+        filter: brightness(0.98);
+      }
+      .fade-in-up {
+        animation: fadeInUp 0.7s cubic-bezier(0.23, 1, 0.32, 1) both;
+      }
+      @keyframes fadeInUp {
+        0% {
+          opacity: 0;
+          transform: translateY(40px);
+        }
+        100% {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .shadow-2xl {
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37) !important;
+      }
+      .rounded-2xl {
+        border-radius: 1.5rem !important;
+      }
+      .backdrop-blur-md {
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+      }
+      .bg-black\/60 {
+        background: rgba(0, 0, 0, 0.6) !important;
+      }
+      .border-purple-700 {
+        border-color: #4e0e8a !important;
+      }
+      .font-heading {
+        font-family: "Sora", "Inter", "Space Grotesk", sans-serif !important;
+      }
+      .font-body {
+        font-family: "Inter", "Space Grotesk", sans-serif !important;
+      }
+      .text-purple-200 {
+        color: #d1aaff !important;
+      }
+      .text-purple-400 {
+        color: #a259ff !important;
+      }
+      .drop-shadow-lg {
+        filter: drop-shadow(0 2px 8px #a259ff88) !important;
+      }
+      .icon-info-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.2em;
+        height: 2.2em;
+        border-radius: 50%;
+        background: none;
+        border: none;
+        color: #d1aaff;
+        font-size: 1.1em;
+        transition: box-shadow 0.15s, background 0.15s, color 0.15s;
+        cursor: pointer;
+        outline: none;
+      }
+      .icon-info-btn:hover,
+      .icon-info-btn:focus {
+        background: rgba(162, 89, 255, 0.12);
+        color: #fff;
+        box-shadow: 0 0 0 2px #a259ff55;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

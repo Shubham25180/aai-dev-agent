@@ -60,11 +60,11 @@ llm:
   # Ollama configuration (for coding tasks)
   ollama:
     model_type: "ollama"
-    model_name: "deepseek-coder-v2:lite" # Your preferred coding model
+    model_name: "llama3.2:3b" # Set to match your available Ollama model
     api_url: "http://localhost:11434"
     max_tokens: 2048
     temperature: 0.3 # Lower for coding
-    timeout: 30
+    timeout: 80
     cache_enabled: true
     max_cache_size: 1000
     cache_ttl: 3600

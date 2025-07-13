@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { sendChatMessage, getStatus, getToggles, updateToggles, WebSocketClient } from './nexusApi';
+import { sendChatMessage, getStatus, getToggles, updateToggle, WebSocketClient, streamLLMResponse } from './nexusApi';
 import type { StatusResponse, TogglesResponse } from './nexusApi';
+import { Button } from "./components/ui/button";
+import { Switch } from "./components/ui/switch";
+import { Slider } from "./components/ui/slider";
+import { GlassCard } from "./components/ui/GlassCard";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "./components/ui/tooltip";
+import { Input } from "./components/ui/input";
+import { cn } from "./lib/utils";
+import { Info, Volume2, Bot, Send } from "lucide-react";
+import { startListener, stopListener, uploadAudio } from './api/voice';
+import { setMoodIntent } from './api/features';
+import { useTranscriptStream } from './hooks/useTranscriptStream';
+import { useProcessingStatus } from './hooks/useProcessingStatus';
 
 interface ChatMessage {
   id: string;
@@ -54,6 +66,11 @@ function App() {
   const [sarcasm, setSarcasm] = useState(50);
   const [verbosity, setVerbosity] = useState(50);
   const [sttEnabled, setSttEnabled] = useState(true);
+  const chatAreaRef = useRef<HTMLDivElement>(null);
+  const statusCardsRef = useRef<HTMLDivElement>(null);
+  const togglesRef = useRef<HTMLDivElement>(null);
+  const slidersRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -113,47 +130,106 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+  useEffect(() => {
+    // Log chat area
+    if (chatAreaRef.current) {
+      console.debug('[Nexus Debug] Chat area DOM node:', chatAreaRef.current);
+      console.debug('[Nexus Debug] Chat area classList:', chatAreaRef.current.className);
+    } else {
+      console.warn('[Nexus Debug] Chat area ref is null.');
+    }
+    // Log status cards
+    if (statusCardsRef.current) {
+      console.debug('[Nexus Debug] Status cards DOM node:', statusCardsRef.current);
+      console.debug('[Nexus Debug] Status cards classList:', statusCardsRef.current.className);
+    } else {
+      console.warn('[Nexus Debug] Status cards ref is null.');
+    }
+    // Log toggles
+    if (togglesRef.current) {
+      console.debug('[Nexus Debug] Toggles DOM node:', togglesRef.current);
+      console.debug('[Nexus Debug] Toggles classList:', togglesRef.current.className);
+    } else {
+      console.warn('[Nexus Debug] Toggles ref is null.');
+    }
+    // Log sliders
+    if (slidersRef.current) {
+      console.debug('[Nexus Debug] Sliders DOM node:', slidersRef.current);
+      console.debug('[Nexus Debug] Sliders classList:', slidersRef.current.className);
+    } else {
+      console.warn('[Nexus Debug] Sliders ref is null.');
+    }
+    // Log footer
+    if (footerRef.current) {
+      console.debug('[Nexus Debug] Footer DOM node:', footerRef.current);
+      console.debug('[Nexus Debug] Footer classList:', footerRef.current.className);
+    } else {
+      console.warn('[Nexus Debug] Footer ref is null.');
+    }
+    console.info('[Nexus Debug] Tailwind debug logging is active.');
+  }, []);
+
+  // Live transcript streaming
+  useTranscriptStream((text) => {
+    setMessages(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: text,
+        timestamp: new Date(),
+        status: 'sent'
+      }
+    ]);
+  });
+
+  // Processing status spinner
+  const processingStatus = useProcessingStatus();
+
+  const handleSendMessage = async (messageToSend?: string) => {
+    const message = (typeof messageToSend === 'string' ? messageToSend : inputMessage).trim();
+    if (!message || isLoading) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputMessage,
+      content: message,
       timestamp: new Date(),
       status: 'sending'
     };
-
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
 
+    // Add a placeholder assistant message for streaming
+    const assistantId = (Date.now() + 1).toString();
+    setMessages(prev => [...prev, {
+      id: assistantId,
+      type: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      status: 'sending'
+    }]);
+
     try {
-      // Try WebSocket first, fallback to REST
-      if (wsClient && wsConnected) {
-        wsClient.send(inputMessage);
-        setMessages(prev => prev.map(msg => 
-          msg.id === userMessage.id ? { ...msg, status: 'sent' } : msg
+      let streamedContent = '';
+      for await (const token of streamLLMResponse(message)) {
+        streamedContent += token;
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantId ? { ...msg, content: streamedContent } : msg
         ));
-      } else {
-        // Fallback to REST API
-        const response = await sendChatMessage(inputMessage);
-        setMessages(prev => [
-          ...prev.map(msg => msg.id === userMessage.id ? { ...msg, status: 'sent' as 'sent' } : msg),
-          {
-            id: (Date.now() + 1).toString(),
-            type: 'assistant',
-            content: response.response,
-            timestamp: new Date(),
-            status: 'sent'
-          } satisfies ChatMessage
-        ]);
       }
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      setMessages(prev => prev.map(msg => 
-        msg.id === userMessage.id ? { ...msg, status: 'error' } : msg
+      setMessages(prev => prev.map(msg =>
+        msg.id === assistantId ? { ...msg, status: 'sent' as const } : msg
       ));
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        type: 'system',
+        content: 'Error streaming response: ' + (error as Error).message,
+        timestamp: new Date(),
+        status: 'error'
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -161,16 +237,12 @@ function App() {
 
   const handleToggleChange = async (key: keyof TogglesResponse) => {
     if (!toggles) return;
-
-    const newToggles = { ...toggles, [key]: !toggles[key] };
-    setToggles(newToggles);
-
+    const newValue = !toggles[key];
     try {
-      await updateToggles({ [key]: newToggles[key] });
+      await updateToggle(key, newValue);
+      setToggles(prev => prev ? { ...prev, [key]: newValue } : prev);
     } catch (error) {
       console.error('Failed to update toggle:', error);
-      // Revert on error
-      setToggles(toggles);
     }
   };
 
@@ -201,161 +273,306 @@ function App() {
     }
   };
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+    // Shift+Enter does nothing for single-line input, but if you switch to textarea, allow newline
+  };
+
+  // STT toggle handler
+  const handleSttToggle = (v: boolean) => {
+    setSttEnabled(v);
+    v ? startListener() : stopListener();
+  };
+
+  // Intent/Emotion toggle handler
+  const handleIntentToggle = (v: boolean) => {
+    handleToggleChange('intent');
+    setMoodIntent(v);
+  };
+  const handleEmotionToggle = (v: boolean) => {
+    handleToggleChange('emotion');
+    setMoodIntent(v);
+  };
+
+  // Audio upload handler
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      uploadAudio(e.target.files[0]).then(res => {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: res.transcript,
+            timestamp: new Date(),
+            status: 'sent'
+          }
+        ]);
+      });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-black text-white flex flex-col">
-      {/* Header */}
-      <header className="w-full border-b border-gray-800 bg-gray-900/80 px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          {/* Removed the main heading for a test/dev layout */}
+    <TooltipProvider>
+      {/* TAILWIND & FONT TEST DIV - REMOVE WHEN CONFIRMED */}
+      <div className="bg-red-500 text-white p-4 font-heading text-xl rounded-lg mb-4 shadow-lg">
+        If this is red and uses Sora, Tailwind and fonts are working. If not, we riot.
+      </div>
+      {/* Add spinner for processing status */}
+      {processingStatus === 'processing' && (
+        <div className="fixed top-4 right-4 z-50 bg-purple-900 text-white px-4 py-2 rounded-lg shadow-lg animate-pulse">
+          Processing...
         </div>
-        {/* Removed the model info from header */}
-      </header>
-
-      {/* Main Content: 3-column grid */}
-      <main className="flex-1 grid grid-cols-8 gap-6 p-8">
-        {/* 1st Column: Status Cards (2/8) */}
-        <div className="col-span-2 flex flex-col h-full justify-between">
-          <div>
-            <div className="grid grid-cols-2 gap-4">
-              <StatusCard
-                title="Voice"
-                value="Active"
-                status="Listening"
-                toggle={<ToggleSwitch label="" checked={!!toggles?.voice} onChange={() => handleToggleChange('voice')} />}
-              />
-              <StatusCard
-                title="TTS"
-                value="edge-tts"
-                status="Ready"
-                toggle={<ToggleSwitch label="" checked={!!toggles?.tts} onChange={() => handleToggleChange('tts')} />}
-              />
-              <StatusCard
-                title="STT"
-                value="Whisper"
-                status="Ready"
-                toggle={<ToggleSwitch label="" checked={sttEnabled} onChange={() => setSttEnabled(v => !v)} />}
-              />
-              <StatusCard title="LLM" value="Ollama" status="Connected" />
+      )}
+      <div className="min-h-screen bg-black text-white flex flex-col font-body">
+        {/* Header */}
+        <header className="w-full border-b border-purple-900 bg-black/80 px-8 py-4 flex items-center justify-between font-heading">
+          <div className="flex items-center space-x-3">
+            {/* Heading can be added here if needed */}
+          </div>
+        </header>
+        {/* Main Content: 3-column grid */}
+        <main className="flex-1 grid grid-cols-8 gap-6 p-8 font-body">
+          {/* 1st Column: Status Cards (2/8) */}
+          <div className="col-span-2 flex flex-col h-full justify-between font-heading" ref={statusCardsRef}>
+            <div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Voice Card */}
+                <GlassCard className="mb-4 bg-gradient-to-br from-purple-900 to-purple-700 shadow-xl rounded-2xl p-6 font-heading">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-200 font-heading">Voice</span>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={!!toggles?.voice} onCheckedChange={() => handleToggleChange('voice')} className="data-[state=checked]:bg-purple-500" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="icon-info-btn" type="button"><Info size={18} /></button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white mt-2">Active</div>
+                  <div className="text-xs mt-1 text-purple-200">Listening</div>
+                </GlassCard>
+                {/* TTS Card */}
+                <GlassCard className="mb-4 bg-gradient-to-br from-purple-900 to-purple-700 shadow-xl rounded-2xl p-6 font-heading">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-200 font-heading">TTS</span>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={!!toggles?.tts} onCheckedChange={() => handleToggleChange('tts')} className="data-[state=checked]:bg-purple-500" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="icon-info-btn" type="button"><Info size={18} /></button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white mt-2">edge-tts</div>
+                  <div className="text-xs mt-1 text-purple-200">Ready</div>
+                </GlassCard>
+                {/* STT Card: update toggle */}
+                <GlassCard className="mb-4 bg-gradient-to-br from-purple-900 to-purple-700 shadow-xl rounded-2xl p-6 font-heading">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-200 font-heading">STT</span>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={sttEnabled} onCheckedChange={handleSttToggle} className="data-[state=checked]:bg-purple-500" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="icon-info-btn" type="button"><Info size={18} /></button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white mt-2">Whisper</div>
+                  <div className="text-xs mt-1 text-purple-200">Ready</div>
+                </GlassCard>
+                {/* LLM Card */}
+                <GlassCard className="mb-4 bg-gradient-to-br from-purple-900 to-purple-700 shadow-xl rounded-2xl p-6 font-heading">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-200 font-heading">LLM</span>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={!!toggles?.auto_scroll} onCheckedChange={() => handleToggleChange('auto_scroll')} className="data-[state=checked]:bg-purple-500" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="icon-info-btn" type="button"><Info size={18} /></button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white mt-2">Ollama</div>
+                  <div className="text-xs mt-1 text-purple-200">Connected</div>
+                </GlassCard>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                {/* Memory Card */}
+                <GlassCard className="mb-4 bg-gradient-to-br from-purple-900 to-purple-800 shadow-xl rounded-2xl p-6 font-heading">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-200 font-heading">Memory</span>
+                    <div className="flex items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="icon-info-btn" type="button"><Info size={18} /></button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white mt-2">Short: 1 | Long: N/A | Core: 2</div>
+                  <div className="text-xs mt-1 text-purple-200">Editable</div>
+                </GlassCard>
+                {/* Agent Card */}
+                <GlassCard className="mb-4 bg-gradient-to-br from-purple-900 to-purple-800 shadow-xl rounded-2xl p-6 font-heading">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-200 font-heading">Agent</span>
+                    <div className="flex items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="icon-info-btn" type="button"><Info size={18} /></button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white mt-2">Processing</div>
+                  <div className="text-xs mt-1 text-purple-200">Idle</div>
+                </GlassCard>
+                {/* GUI Card */}
+                <GlassCard className="mb-4 bg-gradient-to-br from-purple-900 to-purple-800 shadow-xl rounded-2xl p-6 font-heading">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-200 font-heading">GUI</span>
+                    <div className="flex items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="icon-info-btn" type="button"><Info size={18} /></button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white mt-2">Recorder: On</div>
+                </GlassCard>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <StatusCard title="Memory" value="Short: 1 | Long: N/A | Core: 2" status="Editable" />
-              <StatusCard title="Agent" value="Processing" status="Idle" />
-              <StatusCard title="GUI" value="Recorder: On" status="" />
-              <div />
+            {/* Sliders for Wit, Sarcasm, and Verbosity at the very bottom left */}
+            <div className="mt-4 bg-black border-2 border-purple-700 rounded-2xl p-4 flex flex-col gap-2 shadow-lg font-body" ref={togglesRef}>
+              <div className="flex items-center gap-4">
+                <label htmlFor="wit-slider" className="text-sm text-purple-200 font-heading w-24">Wit:</label>
+                <Slider
+                  id="wit-slider"
+                  value={[wit]}
+                  onValueChange={(value: number[]) => setWit(value[0])}
+                  max={100}
+                  min={0}
+                  step={1}
+                  className="flex-1 accent-purple-400 h-2 rounded-lg appearance-none bg-purple-800"
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <label htmlFor="sarcasm-slider" className="text-sm text-purple-200 font-heading w-24">Sarcasm:</label>
+                <Slider
+                  id="sarcasm-slider"
+                  value={[sarcasm]}
+                  onValueChange={(value: number[]) => setSarcasm(value[0])}
+                  max={100}
+                  min={0}
+                  step={1}
+                  className="flex-1 accent-purple-300 h-2 rounded-lg appearance-none bg-purple-800"
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <label htmlFor="verbosity-slider" className="text-sm text-purple-200 font-heading w-24">Verbosity:</label>
+                <Slider
+                  id="verbosity-slider"
+                  value={[verbosity]}
+                  onValueChange={(value: number[]) => setVerbosity(value[0])}
+                  max={100}
+                  min={0}
+                  step={1}
+                  className="flex-1 accent-purple-400 h-2 rounded-lg appearance-none bg-purple-800"
+                />
+              </div>
             </div>
           </div>
-
-          {/* Sliders for Wit, Sarcasm, and Verbosity at the very bottom left */}
-          <div className="flex flex-col gap-2 bg-gray-900 border border-gray-700 rounded-lg p-4 mt-4">
-            <div className="flex items-center gap-4">
-              <label htmlFor="wit-slider" className="text-sm text-gray-300 w-24">Wit:</label>
-              <input
-                id="wit-slider"
-                type="range"
-                min={0}
-                max={100}
-                value={wit}
-                onChange={e => setWit(Number(e.target.value))}
-                className="flex-1 accent-green-600 h-2 rounded-lg appearance-none bg-gray-700"
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <label htmlFor="sarcasm-slider" className="text-sm text-gray-300 w-24">Sarcasm:</label>
-              <input
-                id="sarcasm-slider"
-                type="range"
-                min={0}
-                max={100}
-                value={sarcasm}
-                onChange={e => setSarcasm(Number(e.target.value))}
-                className="flex-1 accent-blue-400 h-2 rounded-lg appearance-none bg-gray-700"
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <label htmlFor="verbosity-slider" className="text-sm text-gray-300 w-24">Verbosity:</label>
-              <input
-                id="verbosity-slider"
-                type="range"
-                min={0}
-                max={100}
-                value={verbosity}
-                onChange={e => setVerbosity(Number(e.target.value))}
-                className="flex-1 accent-green-600 h-2 rounded-lg appearance-none bg-gray-700"
-              />
+          {/* 2nd Column: Chat Area (5/8) */}
+          <div className="col-span-5 flex flex-col bg-black rounded-2xl border border-purple-900 p-6 min-h-[500px] shadow-xl font-body">
+            <div className="flex-1 flex flex-col justify-end">
+              {/* Chat history placeholder */}
+              <div className="flex-1 flex items-center justify-center" ref={chatAreaRef}>
+                <div className="bg-black/60 backdrop-blur-md rounded-2xl shadow-2xl px-8 py-6 border border-purple-700 animate-fade-in-up">
+                  <span className="font-heading text-2xl text-purple-200 drop-shadow-lg">
+                    "Welcome to Nexus: Where AI banter meets code brilliance. <br />
+                    Your next big idea starts here."
+                  </span>
+                  <div className="mt-2 text-purple-400 text-sm font-body opacity-80">
+                    (Chat, code, and conquer. The future is now.)
+                  </div>
+                </div>
+              </div>
+              {/* Chat input placeholder */}
+              <div className="mt-4 flex items-center gap-2">
+                <textarea
+                  className="flex-1 bg-purple-900 border border-purple-700 rounded-lg px-4 py-2 text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-body resize-none min-h-[40px] max-h-[120px]"
+                  placeholder="Type your message or command..."
+                  value={inputMessage}
+                  onChange={e => setInputMessage(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage(inputMessage);
+                    }
+                    // Shift+Enter: allow newline (default behavior)
+                  }}
+                  rows={1}
+                />
+                <Button className="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-md" onClick={() => handleSendMessage(inputMessage)}>
+                  <Send size={20} />
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* 2nd Column: Chat Area (5/8) */}
-        <div className="col-span-5 flex flex-col bg-gray-900 rounded-lg border border-gray-800 p-6 min-h-[500px]">
-          <div className="flex-1 flex flex-col justify-end">
-            {/* Chat history placeholder */}
-            <div className="flex-1 text-gray-400 flex items-center justify-center">
-              <span>Chat area (GPT-style) coming soon...</span>
+          {/* 3rd Column: Additional Buttons (1/8) */}
+          <div className="col-span-1 flex flex-col gap-4 items-stretch font-heading">
+            <Button className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl font-medium transition-colors shadow-md">
+              <Volume2 size={18} /> Speak
+            </Button>
+            <Button className="bg-purple-900 border border-purple-700 rounded-xl px-4 py-2 text-white font-medium hover:bg-purple-800 transition-colors shadow">
+              <Info size={18} /> Show Last Prompt
+            </Button>
+            <Button className="bg-purple-900 border border-purple-700 rounded-xl px-4 py-2 text-white font-medium hover:bg-purple-800 transition-colors shadow">
+              <Info size={18} /> Debug/Transparency
+            </Button>
+            <Button className="bg-purple-900 border border-purple-700 text-purple-300 rounded-xl px-4 py-2 font-medium hover:bg-purple-950 transition-colors shadow">
+              <Info size={18} /> Pinned Facts: none
+            </Button>
+            {/* Toggle Switches */}
+            <div className="mt-4 bg-black border-2 border-purple-700 rounded-2xl p-4 flex flex-col gap-2 shadow-lg font-body">
+              <div className="flex items-center gap-2">
+                <Switch checked={!!toggles?.intent} onCheckedChange={handleIntentToggle} className="data-[state=checked]:bg-purple-500" />
+                <span className="text-purple-200 font-heading text-sm">Intent Detection</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={!!toggles?.emotion} onCheckedChange={handleEmotionToggle} className="data-[state=checked]:bg-purple-500" />
+                <span className="text-purple-200 font-heading text-sm">Emotion Detection</span>
+              </div>
             </div>
-            {/* Chat input placeholder */}
-            <div className="mt-4 flex items-center gap-2">
-              <input
-                type="text"
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-nexus-500 focus:border-transparent"
-                placeholder="Type your message or command..."
-                disabled
-              />
-              <button className="bg-nexus-600 hover:bg-nexus-700 text-white px-6 py-2 rounded-lg font-medium transition-colors" disabled>
-                Send
-              </button>
-            </div>
+            {/* Audio upload input */}
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={handleAudioUpload}
+              className="mt-4 bg-purple-900 border border-purple-700 rounded-lg px-4 py-2 text-white"
+            />
           </div>
-        </div>
-
-        {/* 3rd Column: Additional Buttons (1/8) */}
-        <div className="col-span-1 flex flex-col gap-4 items-stretch">
-          <button
-            className="bg-blue-700 border border-blue-800 rounded-lg px-4 py-2 text-white font-medium hover:bg-blue-800 transition-colors"
-            onClick={handleSpeak}
-          >
-            Speak
-          </button>
-          <button className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-medium hover:bg-gray-700 transition-colors">Show Last Prompt</button>
-          <button className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-medium hover:bg-gray-700 transition-colors">Debug/Transparency</button>
-          <button className="bg-gray-800 border border-blue-700 text-blue-400 rounded-lg px-4 py-2 font-medium hover:bg-blue-900 transition-colors">Pinned Facts: none</button>
-
-          {/* Toggle Switches */}
-          <div className="mt-4 bg-gray-900 border-2 border-blue-500 rounded-lg p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <ToggleSwitch
-                label="Auto-scroll Chat"
-                checked={!!toggles?.auto_scroll}
-                onChange={() => handleToggleChange('auto_scroll')}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <ToggleSwitch
-                label="Intent Detection"
-                checked={!!toggles?.intent}
-                onChange={() => handleToggleChange('intent')}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <ToggleSwitch
-                label="Emotion Detection"
-                checked={!!toggles?.emotion}
-                onChange={() => handleToggleChange('emotion')}
-              />
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="w-full border-t border-gray-800 bg-gray-900/80 px-8 py-2 text-xs text-gray-400 flex items-center justify-between">
-        <span>
-          Voice: Active | TTS: edge-tts | STT: Whisper | LLM: Ollama | Memory: 1 short, 2 core
-          <span className="ml-6">Model: <span className="text-white">Ollama</span><span className="ml-1 text-green-400">Connected</span></span>
-        </span>
-        <span>© 2025 Nexus AI Dev Agent</span>
-      </footer>
-    </div>
+        </main>
+        {/* Footer */}
+        <footer className="w-full border-t border-purple-900 bg-black/80 px-8 py-2 text-xs text-purple-400 flex items-center justify-between font-body" ref={footerRef}>
+          <span>
+            Voice: Active | TTS: edge-tts | STT: Whisper | LLM: Ollama | Memory: 1 short, 2 core
+            <span className="ml-6">Model: <span className="text-white">Ollama</span><span className="ml-1 text-purple-400">Connected</span></span>
+          </span>
+          <span>© 2025 Nexus AI Dev Agent</span>
+        </footer>
+      </div>
+    </TooltipProvider>
   );
 }
 

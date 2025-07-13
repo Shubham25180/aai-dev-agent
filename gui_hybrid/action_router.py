@@ -1,4 +1,3 @@
-from gui_hybrid.vision import Vision
 from gui_hybrid.llm_planner import LLMPlanner
 from gui_hybrid.executor import Executor
 
@@ -7,7 +6,6 @@ class ActionRouter:
     Orchestrates the flow: user intent -> direct Python -> vision/LLM -> execution.
     """
     def __init__(self):
-        self.vision = Vision()
         self.planner = LLMPlanner()
         self.executor = Executor()
 
@@ -21,10 +19,7 @@ class ActionRouter:
             return
         print("[Router] Direct action not possible, using AI/vision fallback...")
         # 2. Use vision/LLM to plan and execute
-        image = self.vision.capture_screen()
-        buttons = self.vision.detect_buttons(image)
-        ocr_text = self.vision.ocr_text(image)
-        screen_context = {'ocr_text': ocr_text, 'buttons': buttons}
+        screen_context = {}
         plan = self.planner.plan_action(user_intent, screen_context)
         if plan.get('action') == 'click' and 'coords' in plan:
             x, y = plan['coords']

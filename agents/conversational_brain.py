@@ -114,6 +114,9 @@ class ConversationalBrain:
         
         self.intent_enabled = self.config.get('features', {}).get('intent_detection', False)
         self.emotion_enabled = self.config.get('features', {}).get('emotion_detection', False)
+        # === TEST: Hard-disable intent and emotion detection for memory error isolation ===
+        self.intent_enabled = False
+        self.emotion_enabled = False
         self.spacy_nlp = spacy.load("en_core_web_sm") if self.intent_enabled else None
         
     def _load_system_prompt(self):

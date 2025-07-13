@@ -45,12 +45,12 @@ export interface ToggleUpdate {
 
 // REST API calls
 export async function sendChatMessage(message: string): Promise<ChatResponse> {
-  const response = await fetch(`${API_BASE}/api/chat`, {
+  const response = await fetch(`${API_BASE}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ text: message }),
   });
   
   if (!response.ok) {
@@ -94,6 +94,78 @@ export async function updateToggles(toggles: ToggleUpdate): Promise<TogglesRespo
   }
   
   return response.json();
+}
+
+// Update a single toggle
+export async function updateToggle(toggleName: keyof TogglesResponse, value: boolean): Promise<{ success: boolean; toggle: string; value: boolean }> {
+  const response = await fetch(`${API_BASE}/api/toggles/${toggleName}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ value }),
+  });
+  if (!response.ok) {
+    throw new Error(`Toggle update API error: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Stream LLM response tokens from the backend via WebSocket.
+ * Usage:
+ *   for await (const token of streamLLMResponse(prompt)) { ... }
+ */
+export async function* streamLLMResponse(prompt: string): AsyncGenerator<string, void, void> {
+  const ws = new WebSocket(`ws://${window.location.hostname}:8000/ws/llm_stream`);
+  let isOpen = false;
+  let done = false;
+
+  const queue: string[] = [];
+  let error: string | null = null;
+
+  ws.onopen = () => {
+    isOpen = true;
+    ws.send(JSON.stringify({ prompt }));
+  };
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'llm_token') {
+        queue.push(data.token);
+      } else if (data.type === 'llm_done') {
+        done = true;
+        ws.close();
+      } else if (data.type === 'error') {
+        error = data.message;
+        done = true;
+        ws.close();
+      }
+    } catch (e) {
+      error = 'Malformed LLM stream message';
+      done = true;
+      ws.close();
+    }
+  };
+  ws.onerror = () => {
+    error = 'WebSocket error';
+    done = true;
+    ws.close();
+  };
+  ws.onclose = () => {
+    done = true;
+  };
+
+  // Wait for tokens to arrive and yield them
+  while (!done || queue.length > 0) {
+    if (queue.length > 0) {
+      yield queue.shift()!;
+    } else if (error) {
+      throw new Error(error);
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
 }
 
 // WebSocket connection for real-time chat
